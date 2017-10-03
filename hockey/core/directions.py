@@ -1,7 +1,7 @@
 import random
 from enum import Enum, auto
 from typing import Tuple
-from util.geometry.angle import AngleInDegrees
+from geometry.angle import AngleInDegrees
 
 class Directions(Enum):
     EAST = auto()
