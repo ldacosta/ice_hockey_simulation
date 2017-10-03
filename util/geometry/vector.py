@@ -3,7 +3,7 @@
 import numpy as np
 from typing import Tuple
 
-from util.geometry.angle import AngleInRadians
+from geometry.angle import AngleInRadians
 
 class Vector2D(object):
     """Representation of 2D Vector"""
