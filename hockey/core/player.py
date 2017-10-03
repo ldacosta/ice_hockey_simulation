@@ -3,11 +3,13 @@ import math
 import random
 
 from typing import Tuple
-
+from geometry.point import Point
 from hockey.core.object_on_ice import ObjectOnIce
 from util.base import normalize_to
-from util.geometry.angle import AngleInRadians, rotatePoint
-from util.geometry.vector import Vector2D, angle_between
+from geometry.vector import Vec2d, angle_between
+from geometry.angle import AngleInRadians, rotatePoint
+# from util.geometry.angle import AngleInRadians, rotatePoint
+# from util.geometry.vector import Vector2D, angle_between
 
 
 class Player(ObjectOnIce):
@@ -33,15 +35,21 @@ class Player(ObjectOnIce):
             new_min = Player.MIN_SPEED_SPRINTING, new_max = Player.MAX_SPEED_SPRINTING,
             old_min = 0, old_max = 1)
         self.current_speed = self.moving_speed
-        super().__init__(prefix_on_id, hockey_world_model, pos=(0.0, 0.0), speed=self.speed_on_xy())
+        super().__init__(prefix_on_id, hockey_world_model,
+                         size=3, # feet
+                         pos_opt=None,
+                         speed_opt=self.speed_on_xy())
         self.reach = normalize_to(
             random.random(),
             new_min = Player.MIN_REACH, new_max = Player.MAX_REACH,
             old_min = 0, old_max = 1)
         self.have_puck = False
 
-    def speed_on_xy(self) -> Vector2D:
-        return self.vector_looking_at().scalar_multiply(self.current_speed)
+    def __setattr__(self, name, value):
+        self.__dict__[name] = value
+
+    def speed_on_xy(self) -> Vec2d:
+        return self.vector_looking_at() * self.current_speed
 
     def move_around(self):
         # maybe irrealistic, but it'll do for now:
@@ -53,25 +61,28 @@ class Player(ObjectOnIce):
         self.speed = self.speed_on_xy()
 
 
-    def __vector_me_to_puck__(self) -> Vector2D:
-        return Vector2D(pt_from=self.pos, pt_to=self.model.puck.pos)
+    def __vector_me_to_puck__(self) -> Vec2d:
+        return Vec2d.from_to(from_pt=self.pos, to_pt=self.model.puck.pos)
 
     def __pt_in_front_of_me__(self) -> Tuple[float, float]:
         p0 = (self.pos[0] + self.reach, self.pos[1])  # looking at angle = 0
-        return rotatePoint(centerPoint=self.pos, point=p0, angle=self.angle_looking_at)
+        p1 = rotatePoint(centerPoint=self.pos, point=p0, angle=self.angle_looking_at)
+        return p1
 
     def can_reach_puck(self) -> bool:
         vector_me_to_puck = self.__vector_me_to_puck__()
-        if vector_me_to_puck.norm() > self.reach: # puck too far
+        if vector_me_to_puck.is_zero(): # I am standing ON TOP OF PUCK!!
+            return True
+        elif vector_me_to_puck.norm() > self.reach: # puck too far
             return False
         else: # is it in front of me?
-            # what is the point "just in front" of me?
+            # what IS the point "just in front" of me?
             p_alpha = self.__pt_in_front_of_me__()
             # find the 2 points that make the diameter of the semi-circle in front of me:
             p_a = rotatePoint(centerPoint=self.pos, point=p_alpha, angle=AngleInRadians(value=math.pi / 2))
             p_b = rotatePoint(centerPoint=self.pos, point=p_alpha, angle=AngleInRadians.from_minus_pi_to_plus_pi(value=-math.pi / 2))
             # vector of the radius:
-            v_radius = Vector2D(pt_from=p_a, pt_to=p_b)
+            v_radius = Vec2d.from_to(from_pt=p_a, to_pt=p_b) # Vector2D(pt_from=p_a, pt_to=p_b)
             # ok, finally:
             the_angle = angle_between(v1 = v_radius, v2 = vector_me_to_puck)
             return the_angle.value <= math.pi
@@ -85,8 +96,9 @@ class Player(ObjectOnIce):
     def can_see_puck(self) -> bool:
         v_me_to_puck = self.__vector_me_to_puck__()
         v_front_of_me = self.vector_looking_at()
-        return (angle_between(v1=v_me_to_puck, v2=v_front_of_me) < AngleInRadians.PI_HALF) or \
-               (angle_between(v1=v_front_of_me, v2=v_me_to_puck) < AngleInRadians.PI_HALF)
+        return angle_between(v1=v_me_to_puck, v2=v_front_of_me) < AngleInRadians.PI_HALF
+        # return (angle_between(v1=v_me_to_puck, v2=v_front_of_me) < AngleInRadians.PI_HALF) or \
+        #        (angle_between(v1=v_front_of_me, v2=v_me_to_puck) < AngleInRadians.PI_HALF)
 
     def __wander_around__(self):
         self.move_around()
@@ -109,16 +121,21 @@ class Player(ObjectOnIce):
             if (not self.model.is_puck_taken()):
                 if self.can_reach_puck():
                     # if I can reach puck, take it.
-                    print("[%s] CAN REACH puck" % (self.unique_id))
-                    self.have_puck = True
-                    self.model.puck.is_taken = True
+                    self.model.give_puck_to(self)
+                    print("[%s]I JUST TOOK the puck!" % (self.unique_id))
                 elif self.can_see_puck():
-                    print("[%s] I can see puck. Going towards it now" % (self.unique_id))
+                    # print("[%s] I can see puck. Going towards it now" % (self.unique_id))
+                    action_taken = False
                     # Turn towards puck
-                    print("I am looking at angle %s, angle to puck is %s, so I am turning to the sum of both" % (self.angle_looking_at, self.angle_to_puck()))
-                    self.angle_looking_at += self.angle_to_puck()
-                    # move a bit
-                    self.move_around() # this assumes we can change direction AND move in 1 step. TODO: revise.
+                    angle_to_puck = self.angle_to_puck()
+                    if abs(angle_to_puck.value) >= math.pi/10: # TODO: do something "better"
+                        # print("I am looking at angle %s, angle to puck is %s, so I am turning to the sum of both" % (self.angle_looking_at, angle_to_puck))
+                        self.angle_looking_at += angle_to_puck
+                        self.speed = self.speed_on_xy()
+                        action_taken = True
+                    if not action_taken:
+                        # move a bit
+                        self.move_around()
                 else:
                     # I can neither reach or even see the puck
                     random_value = random.random()
@@ -132,9 +149,13 @@ class Player(ObjectOnIce):
                         print("[%s] Can't reach OR see puck -> Wandering about" % (self.unique_id))
                         self.__wander_around__()
 
-            else:
-                print("[%s] Puck TAKEN" % (self.unique_id))
-                self.__wander_around__()
+            else: # puck taken
+                if self.have_puck: # by me!
+                    # print("[%s] I have the puck" % (self.unique_id))
+                    self.__wander_around__()
+                else:
+                    # print("[%s] Puck TAKEN" % (self.unique_id))
+                    self.__wander_around__()
 
     def walk_around_with_puck(self):
         if not self.have_puck:
@@ -142,10 +163,10 @@ class Player(ObjectOnIce):
         else:
             self.move_around()
             # and I make the puck follow me:
-            self.model.space.place_agent(self.model.puck, self.__pt_in_front_of_me__())
+            self.model.space.place_agent(self.model.puck, self.pos)
 
-    def vector_looking_at(self) -> Vector2D:
-        return Vector2D.from_angle(self.angle_looking_at)
+    def vector_looking_at(self) -> Vec2d:
+        return Vec2d.from_angle(self.angle_looking_at)
 
     def step(self):
         self.act()
@@ -179,5 +200,8 @@ class Defense(Player):
         super().__init__("defense", hockey_world_model)
 
     def act(self) -> bool:
+        # self.move_by_bouncing_from_walls()
+        # print("[player.act (begin)][%s] pos = %s" % (self.unique_id, self.pos))
         self.walk_around_with_puck() # for now
+        # print("[player.act (end  )][%s] pos = %s" % (self.unique_id, self.pos))
         return True

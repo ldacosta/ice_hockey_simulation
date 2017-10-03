@@ -22,7 +22,7 @@ class PuckPygameRenderable(Renderable):
             circles=[
                 DrawingCircle(
                     center=(self.converter.x_on_screen(self.puck.pos[0]), self.converter.y_on_screen(self.puck.pos[1])),
-                    radius=self.converter.x_on_screen(3 * 0.0834), # 3 inches, this many feet
+                    radius=self.converter.x_on_screen(self.puck.radius),
                     color=Color.WHITE,
                     line_thickness=2),
             ],
