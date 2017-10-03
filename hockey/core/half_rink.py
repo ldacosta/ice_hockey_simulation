@@ -4,6 +4,7 @@ from mesa import Model
 from mesa.datacollection import DataCollector
 from mesa.space import ContinuousSpace
 from mesa.time import RandomActivation
+from geometry.point import Point
 from hockey.core.puck import Puck
 from typing import Optional, Tuple
 
@@ -18,7 +19,7 @@ class HockeyHalfRink(Model):
     HEIGHT_ICE = 85
     GOALIE_X = WIDTH_HALF_ICE - 11
     GOALIE_WIDTH = 6
-    GOALIE_Y_BOTTOM = HEIGHT_ICE // 2 - GOALIE_WIDTH
+    GOALIE_Y_BOTTOM = HEIGHT_ICE / 2 - GOALIE_WIDTH / 2
     GOALIE_Y_TOP = GOALIE_Y_BOTTOM + GOALIE_WIDTH
     OFF_FACEOFF_X = GOALIE_X - 20
     BLUE_LINE_X = 25
@@ -26,8 +27,11 @@ class HockeyHalfRink(Model):
     FACEOFF_TOP_Y = (HEIGHT_ICE - 44) / 2
     FACEOFF_BOTTOM_Y = FACEOFF_TOP_Y + 44
 
-    def __random_position__(self) -> (float, float):
-        return (random.random() * self.width, random.random() * self.height)
+    def get_random_position(self) -> Point:
+        """Returns a random position inside of the half-ice."""
+        # TODO: uncomment next line!
+        return Point(random.random() * self.width, random.random() * self.height)
+        # return Point(self.width/2, self.height/2)
 
     def __init__(self, how_many_defense: int, how_many_offense: int):
         super().__init__()
@@ -48,22 +52,28 @@ class HockeyHalfRink(Model):
         # Set up agents
         # init puck position
         self.puck = Puck(hockey_world_model=self)
-        self.space.place_agent(self.puck, pos = self.__random_position__())
-        # 5 defensive players: creation and random positioning
+        self.space.place_agent(self.puck, pos = self.get_random_position())
+        # defensive players: creation and random positioning
         self.defense = [Defense(hockey_world_model=self) for _ in range(self.count_defense)]
-        [self.space.place_agent(defense_player, pos = self.__random_position__()) for defense_player in self.defense]
-        # 5 offensive players: creation and random positioning
+        [self.space.place_agent(defense_player, pos = self.get_random_position()) for defense_player in self.defense]
+        # offensive players: creation and random positioning
         self.attack = [Forward(hockey_world_model=self) for _ in range(self.count_attackers)]
-        [self.space.place_agent(attacker, pos = self.__random_position__()) for attacker in self.attack]
+        [self.space.place_agent(attacker, pos = self.get_random_position()) for attacker in self.attack]
         # put everyone on the scheduler:
         [self.schedule.add(agent) for agent in [self.puck] + self.defense + self.attack]
         print("[Grid] Success on initialization")
+
+    def give_puck_to(self, agent):
+        agent.have_puck = True
+        self.puck.is_taken = True
+        self.space.place_agent(self.puck, pos=agent.pos)
+        print("[ICE::give_puck_to] %s JUST GOT the puck (its pos: %s; puck's: %s)" % (agent.unique_id, agent.pos, self.puck.pos))
 
     def who_has_the_puck(self) -> Optional[str]:
         """Returns None in no-one has the puck; otherwise returns the id of the agent that has it."""
         for player in self.defense + self.attack:
             if player.have_puck:
-                print("[ICE] %s has the puck" % (player.unique_id))
+                print("[ICE] %s has the puck (its pos: %s; puck's: %s)" % (player.unique_id, player.pos, self.puck.pos))
                 return player.unique_id
         return None
 
@@ -112,5 +122,6 @@ class HockeyHalfRink(Model):
 
 
 if __name__ == "__main__":
-    half_ice_rink = HockeyHalfRink(how_many_defense=5, how_many_offense=5)
-    print(half_ice_rink)
+    hockey_rink = HockeyHalfRink(how_many_offense=5, how_many_defense=5)
+    while True:
+        hockey_rink.step()

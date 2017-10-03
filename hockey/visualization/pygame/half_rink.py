@@ -1,9 +1,12 @@
+
+from functools import reduce
 from rendering.base import Color
 from rendering.pygame.base import DrawingObjects, DrawingRect, DrawingCircle, DrawingLine, Renderable
 
 from hockey.core.half_rink import HockeyHalfRink
 from hockey.visualization.pygame.world_to_canvas import World2CanvasConverter
 from hockey.visualization.pygame.puck import PuckPygameRenderable
+from hockey.visualization.pygame.player import PlayerPygameRenderable
 
 
 class HalfRinklPygameRenderable(Renderable):
@@ -95,8 +98,15 @@ class HalfRinklPygameRenderable(Renderable):
                         thickness=3),
                 ])
         puck = PuckPygameRenderable(puck=self.half_rink.puck, w2c_converter=self.converter).representation()
-        return rink + puck
-
+        all_defense_players = reduce(
+            lambda repr1, repr2: repr1 + repr2,
+            [PlayerPygameRenderable(a_def, w2c_converter=self.converter).representation() for a_def in self.half_rink.defense],
+            DrawingObjects(rects=[], circles=[], lines=[]))
+        all_offensive_players = reduce(
+            lambda repr1, repr2: repr1 + repr2,
+            [PlayerPygameRenderable(a_def, w2c_converter=self.converter).representation() for a_def in self.half_rink.attack],
+            DrawingObjects(rects=[], circles=[], lines=[]))
+        return rink + puck + all_defense_players + all_offensive_players
 
 if __name__ == "__main__":
     half_ice_rink = HalfRinklPygameRenderable(half_rink=None)

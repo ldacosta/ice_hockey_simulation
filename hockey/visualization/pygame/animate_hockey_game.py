@@ -22,6 +22,7 @@ if __name__ == "__main__":
     # Let's get ready to display:
     pygame.display.set_caption("Hockey Monster!!!!!")
     surface = pygame.display.set_mode((HALF_ICE_WIDTH, HALF_ICE_HEIGHT), 0, 32)
+    surface.fill(THECOLORS['black'])
 
     while True:
         tick_time = clock.tick(FPS)

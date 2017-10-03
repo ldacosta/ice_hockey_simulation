@@ -1,8 +1,7 @@
 import numpy as np
-
+from geometry.point import Point
+from geometry.vector import Vec2d
 from hockey.core.object_on_ice import ObjectOnIce
-from util.geometry.vector import Vector2D
-
 
 class Puck(ObjectOnIce):
     """How does a Puck behave?"""
@@ -10,7 +9,12 @@ class Puck(ObjectOnIce):
     def __init__(self, hockey_world_model):
         # initially, the puck goes around randomly at low speed
         speeds = tuple(np.random.normal(loc=0.0, scale=5.0, size=2))
-        super().__init__("puck", hockey_world_model, pos=(0.0, 0.0), speed=Vector2D.from_tip(speeds))
+        self.radius = (3 * 0.0834)/2 # 3 inches of diameter, this many feet
+        super().__init__("puck",
+                         hockey_world_model,
+                         size=self.radius,
+                         pos_opt=None,
+                         speed_opt=Vec2d(speeds))
         self.is_taken = False
 
     def move_around(self):
