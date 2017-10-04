@@ -5,11 +5,13 @@ from mesa.datacollection import DataCollector
 from mesa.space import ContinuousSpace
 from mesa.time import RandomActivation
 from geometry.point import Point
+
+from util.base import choose_first_option_by_roulette
+from util.geometry.lines import cells_between
 from hockey.core.puck import Puck
 from typing import Optional, Tuple
 
-from hockey.core.player import Defense, Forward
-from util.geometry.lines import cells_between
+from hockey.core.player import Defense, Forward, Player
 
 
 class HockeyHalfRink(Model):
@@ -63,18 +65,34 @@ class HockeyHalfRink(Model):
         [self.schedule.add(agent) for agent in [self.puck] + self.defense + self.attack]
         print("[Grid] Success on initialization")
 
+
+
+    def puck_request_by(self, agent):
+        current_owner = self.who_has_the_puck()
+        if current_owner is None:
+            self.give_puck_to(agent)
+        else:
+            power_holder = current_owner.power
+            power_requester = agent.power
+            if not choose_first_option_by_roulette(weight_1=power_holder, weight_2=power_requester):
+                print("[puck_request_by(%s)]: owner (strength %.2f) lost the puck to me (strength %.2f)" % (agent.unique_id, power_holder, power_requester))
+                self.give_puck_to(agent)
+
     def give_puck_to(self, agent):
+        current_owner = self.who_has_the_puck()
+        if current_owner is not None:
+            current_owner.have_puck = False
+            self.puck.is_taken = False
         agent.have_puck = True
         self.puck.is_taken = True
         self.space.place_agent(self.puck, pos=agent.pos)
-        print("[ICE::give_puck_to] %s JUST GOT the puck (its pos: %s; puck's: %s)" % (agent.unique_id, agent.pos, self.puck.pos))
 
-    def who_has_the_puck(self) -> Optional[str]:
-        """Returns None in no-one has the puck; otherwise returns the id of the agent that has it."""
+    def who_has_the_puck(self) -> Optional[Player]:
+        """Returns None in no-one has the puck; otherwise returns the agent that has it."""
         for player in self.defense + self.attack:
             if player.have_puck:
-                print("[ICE] %s has the puck (its pos: %s; puck's: %s)" % (player.unique_id, player.pos, self.puck.pos))
-                return player.unique_id
+                # print("[ICE] %s has the puck (its pos: %s; puck's: %s)" % (player.unique_id, player.pos, self.puck.pos))
+                return player
         return None
 
     def is_puck_taken(self) -> bool:

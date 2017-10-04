@@ -23,6 +23,9 @@ class Player(ObjectOnIce):
     #
     MIN_REACH = 3
     MAX_REACH = 6
+    # power
+    MIN_POWER = 1
+    MAX_POWER = 10
 
     def __init__(self, prefix_on_id: str, hockey_world_model):
         self.angle_looking_at = AngleInRadians.random()
@@ -35,6 +38,10 @@ class Player(ObjectOnIce):
             new_min = Player.MIN_SPEED_SPRINTING, new_max = Player.MAX_SPEED_SPRINTING,
             old_min = 0, old_max = 1)
         self.current_speed = self.moving_speed
+        self.power = normalize_to(
+            random.random(),
+            new_min = Player.MIN_POWER, new_max = Player.MAX_POWER,
+            old_min = 0, old_max = 1)
         super().__init__(prefix_on_id, hockey_world_model,
                          size=3, # feet
                          pos_opt=None,
@@ -57,7 +64,7 @@ class Player(ObjectOnIce):
 
     def spin_around(self):
         self.angle_looking_at.randomly_mutate()
-        print("%s: rotating to angle %s" % (self.unique_id, self.angle_looking_at))
+        # print("%s: rotating to angle %s" % (self.unique_id, self.angle_looking_at))
         self.speed = self.speed_on_xy()
 
 
@@ -115,14 +122,61 @@ class Player(ObjectOnIce):
     def turn_right(self):
         self.angle_looking_at -= (math.pi / 2)
 
-    def try_to_grab_puck(self):
+    def is_puck_owned_by_my_team(self) -> bool:
+        current_owner = self.model.who_has_the_puck()
+        if current_owner is None:
+            return False
+        else:
+            return type(self) == type(current_owner)
+
+    def chase_puck(self, only_when_my_team_doesnt_have_it: bool) -> bool:
+        if (not only_when_my_team_doesnt_have_it) or (not self.is_puck_owned_by_my_team()):
+            if self.can_reach_puck():
+                self.model.puck_request_by(self)
+                if (self.have_puck):
+                    print("[%s] I JUST TOOK the puck!" % (self.unique_id))
+            elif self.can_see_puck():
+                # print("[%s] I can see puck. Going towards it now" % (self.unique_id))
+                action_taken = False
+                # Turn towards puck
+                angle_to_puck = self.angle_to_puck()
+                if abs(angle_to_puck.value) >= math.pi / 10:  # TODO: do something "better"
+                    # print("I am looking at angle %s, angle to puck is %s, so I am turning to the sum of both" % (self.angle_looking_at, angle_to_puck))
+                    self.angle_looking_at += angle_to_puck
+                    self.speed = self.speed_on_xy()
+                    action_taken = True
+                if not action_taken:
+                    # move a bit
+                    self.move_around()
+            else:
+                # I can neither reach or even see the puck
+                random_value = random.random()
+                if random_value < 0.33:
+                    # print("[%s] Can't reach OR see puck -> Turning left" % (self.unique_id))
+                    self.turn_left()
+                elif random_value < 0.67:
+                    # print("[%s] Can't reach OR see puck -> Turning right" % (self.unique_id))
+                    self.turn_right()
+                else:
+                    # print("[%s] Can't reach OR see puck -> Wandering about" % (self.unique_id))
+                    self.__wander_around__()
+            return True
+        else:
+            return False
+
+    def try_to_grab_puck(self, only_when_my_team_doesnt_have_it: bool = False):
+        """
+        Goes for puck.
+        Args:
+            only_when_my_team_doesnt_have_it: when True, only follows if opposing team has it. 
+                                        If False, tries always.
+
+        """
         if not self.have_puck: # if I have it, no need to search!
             # is the puck free and close to me?
             if (not self.model.is_puck_taken()):
                 if self.can_reach_puck():
-                    # if I can reach puck, take it.
                     self.model.give_puck_to(self)
-                    print("[%s]I JUST TOOK the puck!" % (self.unique_id))
                 elif self.can_see_puck():
                     # print("[%s] I can see puck. Going towards it now" % (self.unique_id))
                     action_taken = False
@@ -149,17 +203,14 @@ class Player(ObjectOnIce):
                         print("[%s] Can't reach OR see puck -> Wandering about" % (self.unique_id))
                         self.__wander_around__()
 
-            else: # puck taken
-                if self.have_puck: # by me!
-                    # print("[%s] I have the puck" % (self.unique_id))
-                    self.__wander_around__()
-                else:
-                    # print("[%s] Puck TAKEN" % (self.unique_id))
-                    self.__wander_around__()
+            else: # puck taken - not by me (see logic above)
+                # print("[%s] Puck TAKEN" % (self.unique_id))
+                self.__wander_around__()
 
     def walk_around_with_puck(self):
         if not self.have_puck:
-            self.try_to_grab_puck()
+            if not self.chase_puck(only_when_my_team_doesnt_have_it=True): # try_to_grab_puck()
+                self.__wander_around__()
         else:
             self.move_around()
             # and I make the puck follow me:
