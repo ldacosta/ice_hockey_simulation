@@ -171,12 +171,11 @@ class Player(ObjectOnIce):
 
     def walk_around_with_puck(self):
         if not self.have_puck:
-            if not self.chase_puck(only_when_my_team_doesnt_have_it=True): # try_to_grab_puck()
+            if not self.chase_puck(only_when_my_team_doesnt_have_it=True):
                 self.__wander_around__()
         else:
             # move around - but from time to time, let the puck go
             if random.random() < 0.20:
-                # self.shoot_puck(direction=self.vector_looking_at())
                 self.shoot_puck(direction=Vec2d(tuple(np.random.normal(loc=0.0, scale=5.0, size=2))))
                 self.move_around()
             else:
