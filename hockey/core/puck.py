@@ -1,5 +1,4 @@
 import numpy as np
-from geometry.point import Point
 from geometry.vector import Vec2d
 from hockey.core.object_on_ice import ObjectOnIce
 

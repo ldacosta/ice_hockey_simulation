@@ -1,16 +1,15 @@
 import abc
 import math
 import random
-
 from typing import Tuple
-from geometry.point import Point
+import numpy as np
+
 from hockey.core.object_on_ice import ObjectOnIce
 from util.base import normalize_to
+from geometry.point import Point
 from geometry.vector import Vec2d, angle_between
 from geometry.angle import AngleInRadians, rotatePoint
-# from util.geometry.angle import AngleInRadians, rotatePoint
-# from util.geometry.vector import Vector2D, angle_between
-
+from hockey.core.model import TIME_PER_FRAME
 
 class Player(ObjectOnIce):
     """Hockey Player."""
@@ -23,9 +22,11 @@ class Player(ObjectOnIce):
     #
     MIN_REACH = 3
     MAX_REACH = 6
-    # power
+    # power: serves for puck possession and for shooting
     MIN_POWER = 1
     MAX_POWER = 10
+    # time that takes a player to make a pass (or shoot a puck). In seconds.
+    TIME_TO_PASS_OR_SHOOT = 0.75
 
     def __init__(self, prefix_on_id: str, hockey_world_model):
         self.angle_looking_at = AngleInRadians.random()
@@ -38,6 +39,7 @@ class Player(ObjectOnIce):
             new_min = Player.MIN_SPEED_SPRINTING, new_max = Player.MAX_SPEED_SPRINTING,
             old_min = 0, old_max = 1)
         self.current_speed = self.moving_speed
+        # power: serves for puck possession and for shooting
         self.power = normalize_to(
             random.random(),
             new_min = Player.MIN_POWER, new_max = Player.MAX_POWER,
@@ -51,6 +53,7 @@ class Player(ObjectOnIce):
             new_min = Player.MIN_REACH, new_max = Player.MAX_REACH,
             old_min = 0, old_max = 1)
         self.have_puck = False
+        self.unable_to_play_puck_time = 0
 
     def __setattr__(self, name, value):
         self.__dict__[name] = value
@@ -77,23 +80,25 @@ class Player(ObjectOnIce):
         return p1
 
     def can_reach_puck(self) -> bool:
-        vector_me_to_puck = self.__vector_me_to_puck__()
-        if vector_me_to_puck.is_zero(): # I am standing ON TOP OF PUCK!!
-            return True
-        elif vector_me_to_puck.norm() > self.reach: # puck too far
+        if self.unable_to_play_puck_time > 0:
             return False
-        else: # is it in front of me?
-            # what IS the point "just in front" of me?
-            p_alpha = self.__pt_in_front_of_me__()
-            # find the 2 points that make the diameter of the semi-circle in front of me:
-            p_a = rotatePoint(centerPoint=self.pos, point=p_alpha, angle=AngleInRadians(value=math.pi / 2))
-            p_b = rotatePoint(centerPoint=self.pos, point=p_alpha, angle=AngleInRadians.from_minus_pi_to_plus_pi(value=-math.pi / 2))
-            # vector of the radius:
-            v_radius = Vec2d.from_to(from_pt=p_a, to_pt=p_b) # Vector2D(pt_from=p_a, pt_to=p_b)
-            # ok, finally:
-            the_angle = angle_between(v1 = v_radius, v2 = vector_me_to_puck)
-            return the_angle.value <= math.pi
-
+        else:
+            vector_me_to_puck = self.__vector_me_to_puck__()
+            if vector_me_to_puck.is_zero(): # I am standing ON TOP OF PUCK!!
+                return True
+            elif vector_me_to_puck.norm() > self.reach: # puck too far
+                return False
+            else: # is it in front of me?
+                # what IS the point "just in front" of me?
+                p_alpha = self.__pt_in_front_of_me__()
+                # find the 2 points that make the diameter of the semi-circle in front of me:
+                p_a = rotatePoint(centerPoint=self.pos, point=p_alpha, angle=AngleInRadians(value=math.pi / 2))
+                p_b = rotatePoint(centerPoint=self.pos, point=p_alpha, angle=AngleInRadians.from_minus_pi_to_plus_pi(value=-math.pi / 2))
+                # vector of the radius:
+                v_radius = Vec2d.from_to(from_pt=p_a, to_pt=p_b) # Vector2D(pt_from=p_a, pt_to=p_b)
+                # ok, finally:
+                the_angle = angle_between(v1 = v_radius, v2 = vector_me_to_puck)
+                return the_angle.value <= math.pi
 
     def angle_to_puck(self) -> AngleInRadians:
         v_me_to_puck = self.__vector_me_to_puck__()
@@ -164,62 +169,44 @@ class Player(ObjectOnIce):
         else:
             return False
 
-    def try_to_grab_puck(self, only_when_my_team_doesnt_have_it: bool = False):
-        """
-        Goes for puck.
-        Args:
-            only_when_my_team_doesnt_have_it: when True, only follows if opposing team has it. 
-                                        If False, tries always.
-
-        """
-        if not self.have_puck: # if I have it, no need to search!
-            # is the puck free and close to me?
-            if (not self.model.is_puck_taken()):
-                if self.can_reach_puck():
-                    self.model.give_puck_to(self)
-                elif self.can_see_puck():
-                    # print("[%s] I can see puck. Going towards it now" % (self.unique_id))
-                    action_taken = False
-                    # Turn towards puck
-                    angle_to_puck = self.angle_to_puck()
-                    if abs(angle_to_puck.value) >= math.pi/10: # TODO: do something "better"
-                        # print("I am looking at angle %s, angle to puck is %s, so I am turning to the sum of both" % (self.angle_looking_at, angle_to_puck))
-                        self.angle_looking_at += angle_to_puck
-                        self.speed = self.speed_on_xy()
-                        action_taken = True
-                    if not action_taken:
-                        # move a bit
-                        self.move_around()
-                else:
-                    # I can neither reach or even see the puck
-                    random_value = random.random()
-                    if random_value < 0.33:
-                        print("[%s] Can't reach OR see puck -> Turning left" % (self.unique_id))
-                        self.turn_left()
-                    elif random_value < 0.67:
-                        print("[%s] Can't reach OR see puck -> Turning right" % (self.unique_id))
-                        self.turn_right()
-                    else:
-                        print("[%s] Can't reach OR see puck -> Wandering about" % (self.unique_id))
-                        self.__wander_around__()
-
-            else: # puck taken - not by me (see logic above)
-                # print("[%s] Puck TAKEN" % (self.unique_id))
-                self.__wander_around__()
-
     def walk_around_with_puck(self):
         if not self.have_puck:
-            if not self.chase_puck(only_when_my_team_doesnt_have_it=True): # try_to_grab_puck()
+            if not self.chase_puck(only_when_my_team_doesnt_have_it=True):
                 self.__wander_around__()
         else:
-            self.move_around()
-            # and I make the puck follow me:
-            self.model.space.place_agent(self.model.puck, self.pos)
+            # move around - but from time to time, let the puck go
+            if random.random() < 0.20:
+                self.shoot_puck(direction=Vec2d(tuple(np.random.normal(loc=0.0, scale=5.0, size=2))))
+                self.move_around()
+            else:
+                self.move_around()
+                # and I make the puck follow me:
+                self.model.space.place_agent(self.model.puck, self.pos)
+
+    def release_puck(self):
+        if self.have_puck:
+            self.have_puck = False
+            self.model.puck.is_taken = False
+
+    def __send_puck__(self, puck_speed_vector: Vec2d, speed_multiplier: float):
+        if self.have_puck:
+            speed_multiplier = max([0, speed_multiplier])
+            self.release_puck()
+            self.model.puck.speed = puck_speed_vector.normalized() * speed_multiplier
+            self.unable_to_play_puck_time = self.TIME_TO_PASS_OR_SHOOT
+
+    def shoot_puck(self, direction: Vec2d):
+        self.__send_puck__(puck_speed_vector=direction, speed_multiplier=self.current_speed * 2) # TODO: vary speed
+
+    def pass_puck(self, this_position: Point):
+        direction = Vec2d.from_to(self.pos, this_position)
+        self.__send_puck__(puck_speed_vector=direction, speed_multiplier=self.current_speed * 2) # TODO: vary speed
 
     def vector_looking_at(self) -> Vec2d:
         return Vec2d.from_angle(self.angle_looking_at)
 
     def step(self):
+        self.unable_to_play_puck_time = max(0, self.unable_to_play_puck_time - TIME_PER_FRAME)
         self.act()
 
 

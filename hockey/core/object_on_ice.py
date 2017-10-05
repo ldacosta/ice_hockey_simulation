@@ -6,8 +6,6 @@ from typing import Optional
 from geometry.point import Point
 from geometry.vector import Vec2d
 from hockey.core.model import TIME_PER_FRAME
-# from util.geometry.vector import Vector2D, NULL_2D_VECTOR
-
 
 class ObjectOnIce(Agent):
     """Anything that goes on ice follows this behaviour."""
