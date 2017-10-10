@@ -4,14 +4,17 @@ import random
 from typing import Tuple
 import numpy as np
 
+from core.environment import Sensor, EnvironmentState
+from hockey.behaviour.core.action import HockeyAction
 from hockey.core.object_on_ice import ObjectOnIce
 from util.base import normalize_to
 from geometry.point import Point
 from geometry.vector import Vec2d, angle_between
 from geometry.angle import AngleInRadians, rotatePoint
 from hockey.core.model import TIME_PER_FRAME
+from core.behaviour import Brain
 
-class Player(ObjectOnIce):
+class Player(ObjectOnIce, Sensor):
     """Hockey Player."""
 
     # Remember: all speeds are in feet/second.
@@ -28,7 +31,7 @@ class Player(ObjectOnIce):
     # time that takes a player to make a pass (or shoot a puck). In seconds.
     TIME_TO_PASS_OR_SHOOT = 0.75
 
-    def __init__(self, prefix_on_id: str, hockey_world_model):
+    def __init__(self, prefix_on_id: str, hockey_world_model, brain: Brain):
         self.angle_looking_at = AngleInRadians.random()
         self.moving_speed = normalize_to(
             random.random(),
@@ -44,10 +47,12 @@ class Player(ObjectOnIce):
             random.random(),
             new_min = Player.MIN_POWER, new_max = Player.MAX_POWER,
             old_min = 0, old_max = 1)
-        super().__init__(prefix_on_id, hockey_world_model,
+        self.brain = brain
+        ObjectOnIce.__init__(self, prefix_on_id, hockey_world_model,
                          size=3, # feet
                          pos_opt=None,
                          speed_opt=self.speed_on_xy())
+        Sensor.__init__(self, environment=hockey_world_model)
         self.reach = normalize_to(
             random.random(),
             new_min = Player.MIN_REACH, new_max = Player.MAX_REACH,
@@ -57,6 +62,14 @@ class Player(ObjectOnIce):
 
     def __setattr__(self, name, value):
         self.__dict__[name] = value
+
+    def sense(self) -> EnvironmentState:
+        from hockey.behaviour.core.environment_state import EnvironmentState as HockeyEnvironmentState
+
+        return HockeyEnvironmentState(
+            me=self,
+            puck_owner_opt=self.model.who_has_the_puck(),
+            puck_pos_opt=self.model.puck.pos)
 
     def speed_on_xy(self) -> Vec2d:
         return self.vector_looking_at() * self.current_speed
@@ -117,8 +130,47 @@ class Player(ObjectOnIce):
         if random.random() <= 0.10:
             self.spin_around()
 
-    @abc.abstractmethod
+    def __parse_action__(self, a: HockeyAction):
+        if a == HockeyAction.MOVE_RANDOM_SPEED:
+            self.move_by_bouncing_from_walls()
+            # if I have the puck I have to move the puck too
+            self.model.space.place_agent(self.model.puck, self.pos)
+        elif a == HockeyAction.SPRINT:
+            self.move_by_bouncing_from_walls() # TODO
+        elif a == HockeyAction.SKATE_CALMLY:
+            self.move_by_bouncing_from_walls()  # TODO
+        elif a == HockeyAction.SPIN_RANDOMLY:
+            self.spin_around()
+        elif a == HockeyAction.NOOP:
+            pass # doing nothing alright!
+        elif a == HockeyAction.SHOOT:
+            self.shoot_puck(direction=Vec2d(tuple(np.random.normal(loc=0.0, scale=5.0, size=2))))
+            self.move_around()
+        elif a == HockeyAction.PASS:
+            pass  # TODO
+        elif a == HockeyAction.CHASE_PUCK:
+            self.chase_puck(only_when_my_team_doesnt_have_it=True) # TODO: verify flag
+        elif a == HockeyAction.GRAB_PUCK:
+            self.model.puck_request_by(self)
+            if (self.have_puck):
+                print("[%s] I JUST TOOK the puck!" % (self.unique_id))
+        else:
+            raise RuntimeError("Player does not know how to interpret action %s" % (a))
+
+    # # doing something puck-related
+    # SHOOT = auto()
+    # PASS = auto()
+    # CHASE_PUCK = auto()
+
+
     def act(self) -> bool:
+        actions = self.brain.propose_actions(the_state=self.sense())
+        [self.__parse_action__(an_action) for an_action in actions]
+        return True
+
+
+    @abc.abstractmethod
+    def act2(self) -> bool:
         pass
 
     def turn_left(self):
@@ -175,7 +227,7 @@ class Player(ObjectOnIce):
                 self.__wander_around__()
         else:
             # move around - but from time to time, let the puck go
-            if random.random() < 0.20:
+            if random.random() < 0.05:
                 self.shoot_puck(direction=Vec2d(tuple(np.random.normal(loc=0.0, scale=5.0, size=2))))
                 self.move_around()
             else:
@@ -212,10 +264,10 @@ class Player(ObjectOnIce):
 
 class Forward(Player):
 
-    def __init__(self, hockey_world_model):
-        super().__init__("forward", hockey_world_model)
+    def __init__(self, hockey_world_model, brain: Brain):
+        super().__init__("forward", hockey_world_model, brain)
 
-    def act(self) -> bool:
+    def act2(self) -> bool:
         self.walk_around_with_puck() # for now
         return True
         # if not super().act():
@@ -234,10 +286,10 @@ class Forward(Player):
 
 class Defense(Player):
 
-    def __init__(self, hockey_world_model):
-        super().__init__("defense", hockey_world_model)
+    def __init__(self, hockey_world_model, brain: Brain):
+        super().__init__("defense", hockey_world_model, brain)
 
-    def act(self) -> bool:
+    def act2(self) -> bool:
         # self.move_by_bouncing_from_walls()
         # print("[player.act (begin)][%s] pos = %s" % (self.unique_id, self.pos))
         self.walk_around_with_puck() # for now

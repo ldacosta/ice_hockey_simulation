@@ -11,6 +11,7 @@ from util.geometry.lines import cells_between
 from hockey.core.puck import Puck
 from typing import Optional, Tuple
 
+from hockey.behaviour.core.rule_based_brain import RuleBasedBrain
 from hockey.core.player import Defense, Forward, Player
 
 
@@ -31,12 +32,10 @@ class HockeyHalfRink(Model):
 
     def get_random_position(self) -> Point:
         """Returns a random position inside of the half-ice."""
-        # TODO: uncomment next line!
         return Point(random.random() * self.width, random.random() * self.height)
-        # return Point(self.width/2, self.height/2)
 
     def __init__(self, how_many_defense: int, how_many_offense: int):
-        super().__init__()
+        Model.__init__(self)
         self.height = HockeyHalfRink.HEIGHT_ICE
         self.width = HockeyHalfRink.WIDTH_HALF_ICE
         self.schedule = RandomActivation(self)
@@ -56,16 +55,14 @@ class HockeyHalfRink(Model):
         self.puck = Puck(hockey_world_model=self)
         self.space.place_agent(self.puck, pos = self.get_random_position())
         # defensive players: creation and random positioning
-        self.defense = [Defense(hockey_world_model=self) for _ in range(self.count_defense)]
+        self.defense = [Defense(hockey_world_model=self, brain=RuleBasedBrain()) for _ in range(self.count_defense)]
         [self.space.place_agent(defense_player, pos = self.get_random_position()) for defense_player in self.defense]
         # offensive players: creation and random positioning
-        self.attack = [Forward(hockey_world_model=self) for _ in range(self.count_attackers)]
+        self.attack = [Forward(hockey_world_model=self, brain=RuleBasedBrain()) for _ in range(self.count_attackers)]
         [self.space.place_agent(attacker, pos = self.get_random_position()) for attacker in self.attack]
         # put everyone on the scheduler:
         [self.schedule.add(agent) for agent in [self.puck] + self.defense + self.attack]
         print("[Grid] Success on initialization")
-
-
 
     def puck_request_by(self, agent):
         current_owner = self.who_has_the_puck()
@@ -141,5 +138,7 @@ class HockeyHalfRink(Model):
 
 if __name__ == "__main__":
     hockey_rink = HockeyHalfRink(how_many_offense=5, how_many_defense=5)
-    while True:
-        hockey_rink.step()
+    d = Defense(hockey_world_model=hockey_rink, brain=RuleBasedBrain())
+    print(d)
+    # while True:
+    #     hockey_rink.step()
