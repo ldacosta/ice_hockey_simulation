@@ -12,7 +12,9 @@ from hockey.core.puck import Puck
 from typing import Optional, Tuple
 
 from hockey.behaviour.core.rule_based_brain import RuleBasedBrain
-from hockey.core.player import Defense, Forward, Player
+from hockey.core.player.base import Player
+from hockey.core.player.defense import Defense
+from hockey.core.player.forward import Forward
 
 
 class HockeyHalfRink(Model):

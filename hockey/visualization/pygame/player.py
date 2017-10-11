@@ -1,4 +1,6 @@
-from hockey.core.player import Player, Defense, Forward
+from hockey.core.player.base import Player
+from hockey.core.player.defense import Defense
+from hockey.core.player.forward import Forward
 from rendering.pygame.base import Renderable, DrawingObjects, DrawingCircle, DrawingLine
 from rendering.base import Color
 from hockey.visualization.pygame.world_to_canvas import World2CanvasConverter
