@@ -27,7 +27,7 @@ class ObjectOnIce(Agent):
         self.size = size
 
     def is_moving(self) -> bool:
-        return self.speed.is_zero()
+        return not self.speed.is_zero()
 
     def move_by_bouncing_from_walls(self):
         half_size = self.size/2
