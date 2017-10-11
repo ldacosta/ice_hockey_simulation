@@ -13,18 +13,21 @@ class RuleBasedBrain(Brain):
         Brain.__init__(self)
 
     def propose_actions(self, the_state: EnvironmentState) -> List[HockeyAction]:
-
+        actions = []
         if the_state.have_puck():
             # move around - but from time to time, let the puck go
             if random.random() < 0.05:
-                return [HockeyAction.SHOOT] # random direction. TODO: how do I express it?
+                actions.append(HockeyAction.SHOOT)
             else:
-                return [HockeyAction.MOVE_RANDOM_SPEED]
+                actions.append(HockeyAction.MOVE_RANDOM_SPEED)
         else:
             if the_state.my_team_has_puck():
-                return [HockeyAction.SPIN_RANDOMLY, HockeyAction.SKATE_CALMLY]
+                if random.random() < 0.05:
+                    actions.append(HockeyAction.SPIN_RANDOMLY)
+                actions.append(HockeyAction.SKATE_CALMLY)
             else:
                 if the_state.can_I_reach_puck():
-                    return [HockeyAction.GRAB_PUCK]
+                    actions.append(HockeyAction.GRAB_PUCK)
                 else:
-                    return [HockeyAction.CHASE_PUCK]
+                    actions.append(HockeyAction.CHASE_PUCK)
+        return actions
