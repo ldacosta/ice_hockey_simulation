@@ -5,7 +5,7 @@ from geometry.point import Point
 from geometry.vector import Vec2d, angle_between
 from geometry.angle import AngleInRadians, rotatePoint
 from core.environment_state import EnvironmentState as CoreEnvironmentState
-from hockey.core.player import Player
+from hockey.core.player.base import Player
 
 class EnvironmentState(CoreEnvironmentState):
 

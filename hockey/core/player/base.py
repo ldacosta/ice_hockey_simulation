@@ -1,17 +1,20 @@
 import math
 import random
-from typing import Tuple, List
-import numpy as np
 
-from core.environment import Sensor, EnvironmentState
-from hockey.behaviour.core.action import HockeyAction
-from hockey.core.object_on_ice import ObjectOnIce
-from util.base import normalize_to
+import numpy as np
+from geometry.angle import AngleInRadians, rotatePoint
 from geometry.point import Point
 from geometry.vector import Vec2d, angle_between
-from geometry.angle import AngleInRadians, rotatePoint
-from hockey.core.model import TIME_PER_FRAME
+from typing import Tuple, List, Optional
+
 from core.behaviour import Brain
+from core.environment import Sensor
+from core.environment_state import EnvironmentState
+from hockey.behaviour.core.action import HockeyAction
+from hockey.core.model import TIME_PER_FRAME
+from hockey.core.object_on_ice import ObjectOnIce
+from util.base import normalize_to
+
 
 class Player(ObjectOnIce, Sensor):
     """Hockey Player."""
@@ -65,7 +68,7 @@ class Player(ObjectOnIce, Sensor):
             new_min = Player.MIN_REACH, new_max = Player.MAX_REACH,
             old_min = 0, old_max = 1)
         self.have_puck = False
-        self.unable_to_play_puck_time = 0
+        self.unable_to_play_puck_time = 0.0
 
     def __setattr__(self, name, value):
         self.__dict__[name] = value
@@ -87,7 +90,6 @@ class Player(ObjectOnIce, Sensor):
 
     def spin_around(self):
         self.angle_looking_at.randomly_mutate()
-        # print("%s: rotating to angle %s" % (self.unique_id, self.angle_looking_at))
         self.speed = self.speed_on_xy()
 
 
@@ -152,7 +154,8 @@ class Player(ObjectOnIce, Sensor):
         elif a == HockeyAction.NOOP:
             pass # doing nothing alright!
         elif a == HockeyAction.SHOOT:
-            # TODO: 'towards the goal', unless I don't see it
+            # _should_ be taken care of by specific kind of player -
+            # but if it gets here,, let's throw the puck to a random place.
             self.shoot_puck(direction=Vec2d(tuple(np.random.normal(loc=0.0, scale=5.0, size=2))))
             self.move_around()
         elif a == HockeyAction.PASS:
@@ -161,8 +164,8 @@ class Player(ObjectOnIce, Sensor):
             self.chase_puck(only_when_my_team_doesnt_have_it=True) # TODO: verify flag
         elif a == HockeyAction.GRAB_PUCK:
             self.model.puck_request_by(self)
-            if (self.have_puck):
-                print("[%s] I JUST TOOK the puck!" % (self.unique_id))
+            # if (self.have_puck):
+            #     print("[%s] I JUST TOOK the puck!" % (self.unique_id))
         else:
             raise RuntimeError("Player does not know how to interpret action %s" % (a))
         # wrap-up:
@@ -190,54 +193,29 @@ class Player(ObjectOnIce, Sensor):
         else:
             return type(self) == type(current_owner)
 
-    def chase_puck(self, only_when_my_team_doesnt_have_it: bool) -> bool:
-        if (not only_when_my_team_doesnt_have_it) or (not self.is_puck_owned_by_my_team()):
-            if self.can_reach_puck():
-                self.model.puck_request_by(self)
-                if (self.have_puck):
-                    print("[%s] I JUST TOOK the puck!" % (self.unique_id))
-            elif self.can_see_puck():
-                # print("[%s] I can see puck. Going towards it now" % (self.unique_id))
-                action_taken = False
-                # Turn towards puck
-                angle_to_puck = self.angle_to_puck()
-                if abs(angle_to_puck.value) >= math.pi / 10:  # TODO: do something "better"
-                    # print("I am looking at angle %s, angle to puck is %s, so I am turning to the sum of both" % (self.angle_looking_at, angle_to_puck))
-                    self.angle_looking_at += angle_to_puck
-                    self.speed = self.speed_on_xy()
-                    action_taken = True
-                if not action_taken:
-                    # move a bit
-                    self.move_around()
-            else:
-                # I can neither reach or even see the puck
-                random_value = random.random()
-                if random_value < 0.33:
-                    # print("[%s] Can't reach OR see puck -> Turning left" % (self.unique_id))
-                    self.turn_left()
-                elif random_value < 0.67:
-                    # print("[%s] Can't reach OR see puck -> Turning right" % (self.unique_id))
-                    self.turn_right()
-                else:
-                    # print("[%s] Can't reach OR see puck -> Wandering about" % (self.unique_id))
-                    self.__wander_around__()
-            return True
-        else:
-            return False
+    def first_visible_goal_point(self) -> Optional[Point]:
+        return self.model.first_visible_goal_point_from(a_position=self.pos)
 
-    def walk_around_with_puck(self):
-        if not self.have_puck:
-            if not self.chase_puck(only_when_my_team_doesnt_have_it=True):
-                self.__wander_around__()
+    def chase_puck(self, only_when_my_team_doesnt_have_it: bool) -> bool:
+        """Skate as fast as possible in the direction of the puck."""
+        if self.can_see_puck():
+            # print("[chase_puck][%s] I can see puck. Going towards it now" % (self.unique_id))
+            self.current_speed = self.sprinting_speed # let's go FAST!
+            # Turn towards puck, if needed
+            angle_to_puck = self.angle_to_puck()
+            if abs(angle_to_puck.value) >= math.pi / 10:  # TODO: do something "better"
+                # print(" ====> I am looking at angle %s, angle to puck is %s, so I am turning to the sum of both" % (self.angle_looking_at, angle_to_puck))
+                self.angle_looking_at += angle_to_puck
+            self.speed = self.speed_on_xy()
         else:
-            # move around - but from time to time, let the puck go
-            if random.random() < 0.05:
-                self.shoot_puck(direction=Vec2d(tuple(np.random.normal(loc=0.0, scale=5.0, size=2))))
-                self.move_around()
+            # print("[chase_puck][%s] I can't see puck. " % (self.unique_id))
+            # I can neither reach or even see the puck
+            if random.random() < 0.5:
+                self.turn_left()
             else:
-                self.move_around()
-                # and I make the puck follow me:
-                self.model.space.place_agent(self.model.puck, self.pos)
+                self.turn_right()
+        self.move_by_bouncing_from_walls()
+        return True
 
     def release_puck(self):
         if self.have_puck:
@@ -264,56 +242,3 @@ class Player(ObjectOnIce, Sensor):
     def step(self):
         self.unable_to_play_puck_time = max(0, self.unable_to_play_puck_time - TIME_PER_FRAME)
         self.act()
-
-
-class Forward(Player):
-
-    def __init__(self, hockey_world_model, brain: Brain):
-        super().__init__("forward", hockey_world_model, brain)
-
-    def __parse_action_fwd__(self, a: HockeyAction) -> bool:
-        if a == HockeyAction.SHOOT:
-            print("FWD -> shoot ==================================================================")
-            # TODO: 'towards the goal', unless I don't see it
-            self.shoot_puck(direction=Vec2d(tuple(np.random.normal(loc=0.0, scale=5.0, size=2))))
-            self.move_around()
-        elif a == HockeyAction.PASS:
-            print("FWD -> pass ==================================================================")
-            pass  # TODO
-        else:
-            return False
-        # wrap-up:
-        if self.have_puck:
-            self.model.space.place_agent(self.model.puck, self.pos)
-        return True
-
-    def act(self) -> bool:
-        actions = self.brain.propose_actions(the_state=self.sense())
-        if not self.apply_actions(actions, action_handler=self.__parse_action_fwd__):
-            return self.apply_actions(actions, action_handler=self.__parse_action__)
-
-class Defense(Player):
-
-    def __init__(self, hockey_world_model, brain: Brain):
-        super().__init__("defense", hockey_world_model, brain)
-
-    def __parse_action_def__(self, a: HockeyAction) -> bool:
-        if a == HockeyAction.SHOOT:
-            # TODO: 'away from goal'
-            self.shoot_puck(direction=Vec2d(tuple(np.random.normal(loc=0.0, scale=5.0, size=2))))
-            self.move_around()
-        elif a == HockeyAction.PASS:
-            print("DEFENSE -> pass TODO =============================================================")
-            pass  # TODO
-        else:
-            return False
-        # wrap-up:
-        if self.have_puck:
-            self.model.space.place_agent(self.model.puck, self.pos)
-        return True
-
-    def act(self) -> bool:
-        actions = self.brain.propose_actions(the_state=self.sense())
-        if not self.apply_actions(actions, action_handler=self.__parse_action_def__):
-            return self.apply_actions(actions, action_handler=self.__parse_action__)
-
