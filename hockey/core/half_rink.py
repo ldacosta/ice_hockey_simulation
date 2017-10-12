@@ -55,18 +55,25 @@ class HockeyHalfRink(Model):
         # Set up agents
         # init puck position
         self.puck = Puck(hockey_world_model=self)
-        self.space.place_agent(self.puck, pos = self.get_random_position())
         # defensive players: creation and random positioning
         self.defense = [Defense(hockey_world_model=self, brain=RuleBasedBrain()) for _ in range(self.count_defense)]
-        [self.space.place_agent(defense_player, pos = self.get_random_position()) for defense_player in self.defense]
         # offensive players: creation and random positioning
         self.attack = [Forward(hockey_world_model=self, brain=RuleBasedBrain()) for _ in range(self.count_attackers)]
-        [self.space.place_agent(attacker, pos = self.get_random_position()) for attacker in self.attack]
         # put everyone on the scheduler:
         [self.schedule.add(agent) for agent in [self.puck] + self.defense + self.attack]
+        # positioning
+        self.reset_positions_of_agents()
         # number of goals scored
         self.goals_scored = 0
         print("[Grid] Success on initialization")
+
+    def reset_positions_of_agents(self):
+        """Sets the players positions as at the beginning of an iteration."""
+
+        self.space.place_agent(self.puck, pos = self.get_random_position())
+        [self.space.place_agent(defense_player, pos = Point(self.GOALIE_X, self.get_random_position().y)) for defense_player in self.defense]
+        [self.space.place_agent(attacker, pos = Point(self.BLUE_LINE_X, self.get_random_position().y)) for attacker in self.attack]
+
 
     def puck_request_by(self, agent):
         current_owner = self.who_has_the_puck()
@@ -106,8 +113,12 @@ class HockeyHalfRink(Model):
         * A Goal happened.
         * A "degagement" happened
         '''
+        goals_before = self.goals_scored
         self.schedule.step()
         self.datacollector.collect(self)
+        if self.goals_scored > goals_before:
+            print("[half-rink] Goal scored! (now %d in total). Resetting positions of agents" % (self.goals_scored))
+            self.reset_positions_of_agents()
 
     def first_visible_goal_point_from(self, a_position: Point) -> Optional[Point]:
         """From a certain position, can I see the goal?"""
