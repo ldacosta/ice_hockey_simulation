@@ -13,9 +13,13 @@ class Forward(Player):
 
     def __parse_action_fwd__(self, a: HockeyAction) -> bool:
         if a == HockeyAction.SHOOT:
-            print("FWD -> shoot ==================================================================")
-            # TODO: 'towards the goal', unless I don't see it
-            self.shoot_puck(direction=Vec2d(tuple(np.random.normal(loc=0.0, scale=5.0, size=2))))
+            pt_in_goal_opt = self.first_visible_goal_point()
+            if pt_in_goal_opt is None:
+                direction = Vec2d(tuple(np.random.normal(loc=0.0, scale=5.0, size=2)))
+            else:
+                direction = Vec2d.origin_to(pt_in_goal_opt)
+                print("FWD -> shoot TOWARDS THE GOAL ==================================================================")
+            self.shoot_puck(direction)
             self.move_around()
         elif a == HockeyAction.PASS:
             print("FWD -> pass ==================================================================")

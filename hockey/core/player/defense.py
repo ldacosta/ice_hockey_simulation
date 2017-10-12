@@ -1,6 +1,9 @@
 import numpy as np
+from random import random
+from geometry.point import Point
 from geometry.vector import Vec2d
 
+from util.base import normalize_to
 from core.behaviour import Brain
 from hockey.behaviour.core.action import HockeyAction
 from hockey.core.player.base import Player
@@ -13,8 +16,8 @@ class Defense(Player):
 
     def __parse_action_def__(self, a: HockeyAction) -> bool:
         if a == HockeyAction.SHOOT:
-            # TODO: 'away from goal'
-            self.shoot_puck(direction=Vec2d(tuple(np.random.normal(loc=0.0, scale=5.0, size=2))))
+            pt_to_shoot_to = Point(x = 0.0, y = normalize_to(random(), new_min=0, new_max=self.model.height, old_min=0.0, old_max=1.0))
+            self.shoot_puck(direction=Vec2d.from_to(from_pt=self.pos, to_pt=pt_to_shoot_to))
             self.move_around()
         elif a == HockeyAction.PASS:
             print("DEFENSE -> pass TODO =============================================================")

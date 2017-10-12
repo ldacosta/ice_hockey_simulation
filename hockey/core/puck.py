@@ -17,7 +17,7 @@ class Puck(ObjectOnIce):
         self.is_taken = False
 
     def move_around(self):
-        self.move_by_bouncing_from_walls()
+        self.move_by_bouncing_from_walls(prob_of_score_on_goal=0.5) # TODO: fix this
 
     def step(self):
         # if the puck is taken it will move with the carrier
