@@ -64,6 +64,8 @@ class HockeyHalfRink(Model):
         [self.space.place_agent(attacker, pos = self.get_random_position()) for attacker in self.attack]
         # put everyone on the scheduler:
         [self.schedule.add(agent) for agent in [self.puck] + self.defense + self.attack]
+        # number of goals scored
+        self.goals_scored = 0
         print("[Grid] Success on initialization")
 
     def puck_request_by(self, agent):
@@ -74,7 +76,7 @@ class HockeyHalfRink(Model):
             power_holder = current_owner.power
             power_requester = agent.power
             if not choose_first_option_by_roulette(weight_1=power_holder, weight_2=power_requester):
-                print("[puck_request_by(%s)]: owner (strength %.2f) lost the puck to me (strength %.2f)" % (agent.unique_id, power_holder, power_requester))
+                # print("[puck_request_by(%s)]: owner (strength %.2f) lost the puck to me (strength %.2f)" % (agent.unique_id, power_holder, power_requester))
                 self.give_puck_to(agent)
 
     def give_puck_to(self, agent):
@@ -107,18 +109,21 @@ class HockeyHalfRink(Model):
         self.schedule.step()
         self.datacollector.collect(self)
 
-    def first_visible_goal_point_from(self, a_position: Tuple[int, int]) -> Optional[Tuple[int, int]]:
+    def first_visible_goal_point_from(self, a_position: Point) -> Optional[Point]:
         """From a certain position, can I see the goal?"""
 
+        x, y = a_position
         # do I see _any_ part of the goal?
         goal_x = self.goal_position[0]
+        if x > goal_x:
+            # if I am behind the goal, I can't see any of its points
+            return None
         y_in_goal = self.goal_position[1][0] - 1
         found_clear_path = False
         while (not found_clear_path) and (y_in_goal < self.goal_position[1][1]):
             y_in_goal += 1
-            x, y = a_position
             #
-            cells_on_way = cells_between(a_position, (goal_x, y_in_goal))
+            cells_on_way = cells_between(tuple(map(round, a_position.as_tuple())), (goal_x, y_in_goal))
             # let's visit all cells to see if it's free
             free_path = True
             idx_cell_in_way = -1
@@ -126,14 +131,14 @@ class HockeyHalfRink(Model):
             while free_path and idx_cell_in_way < max_idx_cells_in_way:
                 idx_cell_in_way += 1
                 x_in_way, y_in_way = cells_on_way[idx_cell_in_way]
-                free_path = self.grid.is_cell_empty(pos=(x_in_way, y_in_way))
+                free_path = True # TODO. Was (in discrete space): self.grid.is_cell_empty(pos=(x_in_way, y_in_way))
             found_clear_path = free_path
         if found_clear_path:
-            return (goal_x, y_in_goal)
+            return Point(goal_x, y_in_goal)
         else:
             return None
 
-    def clear_path_to_goal_from(self, a_position: Tuple[int, int]) -> bool:
+    def clear_path_to_goal_from(self, a_position: Point) -> bool:
         """From a certain position, can I see the goal?"""
         return not (self.first_visible_goal_point_from(a_position) is None)
 
