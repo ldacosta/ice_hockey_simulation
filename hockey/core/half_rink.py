@@ -5,17 +5,17 @@ from mesa.datacollection import DataCollector
 from mesa.space import ContinuousSpace
 from mesa.time import RandomActivation
 from geometry.point import Point
+from geometry.vector import Vec2d
 
 from util.base import choose_first_option_by_roulette
 from util.geometry.lines import cells_between
 from hockey.core.puck import Puck
-from typing import Optional, Tuple
+from typing import Optional
 
 from hockey.behaviour.core.rule_based_brain import RuleBasedBrain
 from hockey.core.player.base import Player
 from hockey.core.player.defense import Defense
 from hockey.core.player.forward import Forward
-
 
 class HockeyHalfRink(Model):
     """The attacking side of a Hockey Rink."""
@@ -26,6 +26,7 @@ class HockeyHalfRink(Model):
     GOALIE_WIDTH = 6
     GOALIE_Y_BOTTOM = HEIGHT_ICE / 2 - GOALIE_WIDTH / 2
     GOALIE_Y_TOP = GOALIE_Y_BOTTOM + GOALIE_WIDTH
+    GOALIE_CENTER = Point(GOALIE_X, (GOALIE_Y_TOP + GOALIE_Y_BOTTOM) / 2)
     OFF_FACEOFF_X = GOALIE_X - 20
     BLUE_LINE_X = 25
     NEUTRAL_FACEOFF_X = BLUE_LINE_X - 2
@@ -86,11 +87,38 @@ class HockeyHalfRink(Model):
                 # print("[puck_request_by(%s)]: owner (strength %.2f) lost the puck to me (strength %.2f)" % (agent.unique_id, power_holder, power_requester))
                 self.give_puck_to(agent)
 
+    def prob_of_scoring_from_distance(self, distance_to_goal: float) -> float:
+        # based on http://www.omha.net/news_article/show/667329-the-science-of-scoring
+        if distance_to_goal <= 10:
+            return 0.21
+        elif distance_to_goal <= 20:
+            return 0.34
+        elif distance_to_goal <= 30:
+            return 0.18
+        elif distance_to_goal <= 40:
+            return 0.11
+        elif distance_to_goal <= 50:
+            return 0.07
+        elif distance_to_goal <= 60:
+            return 0.05
+        else:
+            return 0.00
+
+    def prob_of_scoring_from(self, a_pos: Point) -> float:
+        """Probability of scoring from a certain point on the half-ice."""
+        if a_pos.x > self.GOALIE_X:
+            # behind the goal. Pas de chance.
+            return 0.0
+        else:
+            return self.prob_of_scoring_from_distance(self.distance_to_goal(a_pos))
+
+    def distance_to_goal(self, a_pos: Point) -> float:
+        return Vec2d.from_to(from_pt=a_pos, to_pt=self.GOALIE_CENTER).norm()
+
     def give_puck_to(self, agent):
         current_owner = self.who_has_the_puck()
         if current_owner is not None:
-            current_owner.have_puck = False
-            self.puck.is_taken = False
+            current_owner.release_puck()
         agent.have_puck = True
         self.puck.is_taken = True
         self.space.place_agent(self.puck, pos=agent.pos)

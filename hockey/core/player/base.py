@@ -220,21 +220,23 @@ class Player(ObjectOnIce, Sensor):
     def release_puck(self):
         if self.have_puck:
             self.have_puck = False
-            self.model.puck.is_taken = False
+            self.model.puck.set_free()
 
-    def __send_puck__(self, puck_speed_vector: Vec2d, speed_multiplier: float):
+    def __send_puck__(self, puck_speed_vector: Vec2d, speed_multiplier: float) -> bool:
         if self.have_puck:
             speed_multiplier = max([0, speed_multiplier])
             self.release_puck()
             self.model.puck.speed = puck_speed_vector.normalized() * speed_multiplier
             self.unable_to_play_puck_time = self.TIME_TO_PASS_OR_SHOOT
+            return True
+        return False
 
-    def shoot_puck(self, direction: Vec2d):
-        self.__send_puck__(puck_speed_vector=direction, speed_multiplier=self.current_speed * 2) # TODO: vary speed
+    def shoot_puck(self, direction: Vec2d) -> bool:
+        return self.__send_puck__(puck_speed_vector=direction, speed_multiplier=self.current_speed * 2) # TODO: vary speed
 
-    def pass_puck(self, this_position: Point):
+    def pass_puck(self, this_position: Point) -> bool:
         direction = Vec2d.from_to(self.pos, this_position)
-        self.__send_puck__(puck_speed_vector=direction, speed_multiplier=self.current_speed * 2) # TODO: vary speed
+        return self.__send_puck__(puck_speed_vector=direction, speed_multiplier=self.current_speed * 2) # TODO: vary speed
 
     def vector_looking_at(self) -> Vec2d:
         return Vec2d.from_angle(self.angle_looking_at)

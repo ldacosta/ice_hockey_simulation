@@ -49,7 +49,8 @@ class ObjectOnIce(Agent):
                 new_speed *= -1
             elif new_position >= (max_value - half_size):
                 if goal_on_max:
-                    print("With probability %.2f we will see a goal now" % (prob_of_score_on_goal))
+                    if prob_of_score_on_goal > 0:
+                        print("With probability %.2f we will see a goal now" % (prob_of_score_on_goal))
                     dice_throw = random()
                     if dice_throw <= prob_of_score_on_goal:
                         self.model.goals_scored += 1
@@ -60,7 +61,8 @@ class ObjectOnIce(Agent):
                     elif prob_of_score_on_goal >= 0.8:
                         print("Quel arret du gardien!!")
                     else:
-                        print("No goal")
+                        if prob_of_score_on_goal > 0:
+                            print("No goal")
                 if not goal:
                     # formula is: (max_value - self.size) - (new_position - (max_value - self.size))
                     new_position = 2 * (max_value - half_size) - new_position

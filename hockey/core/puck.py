@@ -15,9 +15,21 @@ class Puck(ObjectOnIce):
                          pos_opt=None,
                          speed_opt=Vec2d(speeds))
         self.is_taken = False
+        self.prob_of_goal = 0.0 # If this puck where to end up in the goal, what is the probability that it would be a goal?
+
+    def __setattr__(self, name, value):
+        if name == "prob_of_goal":
+            if name in self.__dict__:
+                if (self.__dict__[name] != value):
+                    print("Changing value of '%s' from %.2f to %.2f" % (name, self.__dict__[name], value))
+        self.__dict__[name] = value
 
     def move_around(self):
-        self.move_by_bouncing_from_walls(prob_of_score_on_goal=0.5) # TODO: fix this
+        self.move_by_bouncing_from_walls(prob_of_score_on_goal=self.prob_of_goal)
+
+    def set_free(self):
+        self.is_taken = False
+        self.prob_of_goal = 0.0
 
     def step(self):
         # if the puck is taken it will move with the carrier
