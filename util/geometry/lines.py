@@ -1,5 +1,9 @@
 from typing import Tuple, List
 
+def frange(x, y, jump):
+  while x < y:
+    yield x
+    x += jump
 
 class StraightLine(object):
 
@@ -8,7 +12,7 @@ class StraightLine(object):
         self.b = b
 
     @classmethod
-    def goes_by(cls, point_1: Tuple[int, int], point_2: Tuple[int, int]):
+    def goes_by(cls, point_1: Tuple[float, float], point_2: Tuple[float, float]):
         x1, y1 = point_1
         x2, y2 = point_2
         # equation from 'here' to goal:
@@ -20,14 +24,14 @@ class StraightLine(object):
         # apply.
         return self.delta * an_x + self.b
 
-    def cells_between(self, cell_1: Tuple[int, int], cell_2: Tuple[int, int]) -> List[Tuple[int, int]]:
+    def cells_between(self, cell_1: Tuple[float, float], cell_2: Tuple[float, float]) -> List[Tuple[float, float]]:
         x1, y1 = cell_1
         x2, y2 = cell_2
-        all_xs = list(range(x1, x2))
+        all_xs = list(frange(x1, x2, 0.1))
         all_ys = [int(self.apply_to(x)) for x in all_xs]
         return list(zip(all_xs, all_ys))
 
-def cells_between(cell_1: Tuple[int, int], cell_2: Tuple[int, int]) -> List[Tuple[int, int]]:
+def cells_between(cell_1: Tuple[float, float], cell_2: Tuple[float, float]) -> List[Tuple[float, float]]:
 
     # equation from 'here' to goal:
     straight_line = StraightLine.goes_by(point_1=cell_1, point_2=cell_2)
