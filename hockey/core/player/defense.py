@@ -1,4 +1,5 @@
 import numpy as np
+from typing import List
 from random import random
 from geometry.point import Point
 from geometry.vector import Vec2d
@@ -29,7 +30,10 @@ class Defense(Player):
             self.model.space.place_agent(self.model.puck, self.pos)
         return True
 
+    def apply_actions(self, actions: List[HockeyAction]) -> bool:
+        if not [self.__parse_action_def__(an_action) for an_action in actions][-1]:
+            return Player.apply_actions(self, actions)
+
     def act(self) -> bool:
         actions = self.brain.propose_actions(the_state=self.sense())
-        if not self.apply_actions(actions, action_handler=self.__parse_action_def__):
-            return self.apply_actions(actions, action_handler=self.__parse_action__)
+        return self.apply_actions(actions)

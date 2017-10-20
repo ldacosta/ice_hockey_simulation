@@ -15,7 +15,6 @@ from hockey.core.model import TIME_PER_FRAME
 from hockey.core.object_on_ice import ObjectOnIce
 from util.base import normalize_to
 
-
 class Player(ObjectOnIce, Sensor):
     """Hockey Player."""
 
@@ -69,13 +68,13 @@ class Player(ObjectOnIce, Sensor):
             old_min = 0, old_max = 1)
         self.have_puck = False
         self.unable_to_play_puck_time = 0.0
+        self.speed = self.speed_on_xy()
 
     def __setattr__(self, name, value):
         self.__dict__[name] = value
 
     def sense(self) -> EnvironmentState:
         from hockey.behaviour.core.environment_state import EnvironmentState as HockeyEnvironmentState
-
         return HockeyEnvironmentState(
             me=self,
             puck_owner_opt=self.model.who_has_the_puck(),
@@ -173,12 +172,15 @@ class Player(ObjectOnIce, Sensor):
             self.model.space.place_agent(self.model.puck, self.pos)
         return True
 
-    def apply_actions(self, actions: List[HockeyAction], action_handler) -> bool:
-        actions = self.brain.propose_actions(the_state=self.sense())
-        return [action_handler(an_action) for an_action in actions][-1]
+    # def apply_actions(self, actions: List[HockeyAction], action_handler = __parse_action__) -> bool:
+    #     actions = self.brain.propose_actions(the_state=self.sense())
+    #     return [action_handler(an_action) for an_action in actions][-1]
+
+    def apply_actions(self, actions: List[HockeyAction]) -> bool:
+        return [self.__parse_action__(an_action) for an_action in actions][-1]
 
     def act(self) -> bool:
-        return self.apply_actions(self.brain.propose_actions(the_state=self.sense()), action_handler=self.__parse_action__)
+        return self.apply_actions(self.brain.propose_actions(the_state=self.sense())) #, action_handler=self.__parse_action__)
 
     def turn_left(self):
         self.angle_looking_at += (math.pi / 2)

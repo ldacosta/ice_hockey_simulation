@@ -1,4 +1,6 @@
 import numpy as np
+from typing import List
+
 from geometry.vector import Vec2d
 
 from core.behaviour import Brain
@@ -34,7 +36,19 @@ class Forward(Player):
             self.model.space.place_agent(self.model.puck, self.pos)
         return True
 
+
+    def apply_actions(self, actions: List[HockeyAction]) -> bool:
+        if not [self.__parse_action_fwd__(an_action) for an_action in actions][-1]:
+            return Player.apply_actions(self, actions)
+
+    #
+    # def apply_actions(self, actions: List[HockeyAction], action_handler = None) -> bool:
+    #     if action_handler is None:
+    #         Player.apply_actions(s)
+    #         if not super.apply_actions(self, actions, action_handler=self.__parse_action_fwd__):
+    #             return super.apply_actions(self, actions, action_handler=self.__parse_action__)
+
+
     def act(self) -> bool:
         actions = self.brain.propose_actions(the_state=self.sense())
-        if not self.apply_actions(actions, action_handler=self.__parse_action_fwd__):
-            return self.apply_actions(actions, action_handler=self.__parse_action__)
+        return self.apply_actions(actions)
