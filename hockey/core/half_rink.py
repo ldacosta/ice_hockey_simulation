@@ -16,6 +16,7 @@ from hockey.behaviour.core.rule_based_brain import RuleBasedBrain
 from hockey.core.player.base import Player
 from hockey.core.player.defense import Defense
 from hockey.core.player.forward import Forward
+from hockey.core.model import TIME_PER_FRAME
 
 class HockeyHalfRink(Model):
     """The attacking side of a Hockey Rink."""
@@ -37,18 +38,31 @@ class HockeyHalfRink(Model):
         """Returns a random position inside of the half-ice."""
         return Point(random.random() * self.width, random.random() * self.height)
 
-    def __init__(self, how_many_defense: int, how_many_offense: int):
+    def __init__(self, how_many_defense: int, how_many_offense: int, one_step_in_seconds: float, collect_data_every_secs: float):
+        assert one_step_in_seconds > 0 and how_many_defense >= 0 and how_many_offense >= 0
         Model.__init__(self)
+        self.one_step_in_seconds = one_step_in_seconds
+        # every how many steps do I have to collect data:
+        self.collect_every_steps = (1 / self.one_step_in_seconds) * collect_data_every_secs
         self.height = HockeyHalfRink.HEIGHT_ICE
         self.width = HockeyHalfRink.WIDTH_HALF_ICE
         self.schedule = RandomActivation(self)
         # if this was a Grid, the attribute would be called 'self.grid'
         # But because it is continuous, it is called 'self.space'
         self.space = ContinuousSpace(x_max=self.width, y_max=self.height, torus=False) # SingleGrid(height=self.height, width=self.width, torus=False)
-        # TODO: properly set up the DataCollector
-        # self.datacollector = DataCollector(
-        #     {"x": lambda a: a.pos[0], "y": lambda a: a.pos[1]})# For testing purposes, agent's individual x and y
-        self.datacollector = DataCollector()
+        # data collector
+        self.datacollector = DataCollector(
+            model_reporters={
+                "timestamp": lambda m: m.schedule.steps * m.one_step_in_seconds,
+                "goals": lambda m: m.goals_scored,
+            },
+            agent_reporters={
+                "pos_x": lambda agent : agent.pos.x,
+                "pos_y": lambda agent: agent.pos.y,
+                "speed_x": lambda agent: agent.speed.x,
+                "speed_y": lambda agent: agent.speed.y,
+            }
+        )
         #
         self.goal_position = (HockeyHalfRink.GOALIE_X,(HockeyHalfRink.GOALIE_Y_BOTTOM, HockeyHalfRink.GOALIE_Y_TOP))
         self.count_defense = how_many_defense
@@ -134,6 +148,17 @@ class HockeyHalfRink(Model):
     def is_puck_taken(self) -> bool:
         return not (self.who_has_the_puck() is None)
 
+
+    def collect_data_if_is_time(self):
+        # self.schedule.steps
+        num_data_collected = len(self.datacollector.model_vars['goals'])
+        if self.schedule.steps >= (num_data_collected + 1) * self.collect_every_steps:
+            self.datacollector.collect(self)
+
+    def update_running_flag(self):
+        HOW_MANY_MINUTES_TO_RECORD = 5 # minutes of play
+        self.running  = (self.schedule.steps <= (1 / TIME_PER_FRAME) * (60 * HOW_MANY_MINUTES_TO_RECORD))
+
     def step(self):
         '''
         Run one step of the model. 
@@ -143,10 +168,11 @@ class HockeyHalfRink(Model):
         '''
         goals_before = self.goals_scored
         self.schedule.step()
-        self.datacollector.collect(self)
+        self.collect_data_if_is_time()
         if self.goals_scored > goals_before:
             print("[half-rink] Goal scored! (now %d in total). Resetting positions of agents" % (self.goals_scored))
             self.reset_positions_of_agents()
+        self.update_running_flag()
 
     def first_visible_goal_point_from(self, a_position: Point) -> Optional[Point]:
         """From a certain position, can I see the goal?"""
@@ -162,7 +188,7 @@ class HockeyHalfRink(Model):
         while (not found_clear_path) and (y_in_goal < self.goal_position[1][1]):
             y_in_goal += 1
             #
-            cells_on_way = cells_between(tuple(map(round, a_position.as_tuple())), (goal_x, y_in_goal))
+            cells_on_way = cells_between(a_position.as_tuple(), (goal_x, y_in_goal))
             # let's visit all cells to see if it's free
             free_path = True
             idx_cell_in_way = -1
