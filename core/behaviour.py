@@ -13,4 +13,4 @@ class Brain(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def propose_actions(self, the_state: EnvironmentState) -> List[Action]:
-        pass
+        raise NotImplementedError()
