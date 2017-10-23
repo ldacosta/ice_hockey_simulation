@@ -15,20 +15,25 @@ class Forward(Player):
 
     def __parse_action_fwd__(self, a: HockeyAction) -> bool:
         if a == HockeyAction.SHOOT:
-            pt_in_goal_opt = self.first_visible_goal_point()
-            if pt_in_goal_opt is None:
-                direction = Vec2d(tuple(np.random.normal(loc=0.0, scale=5.0, size=2)))
-                scoring_prob = 0.0
-            else:
-                direction = Vec2d.from_to(from_pt=self.pos, to_pt=pt_in_goal_opt)
-                scoring_prob = self.model.prob_of_scoring_from(self.pos)
-                print("[%s] shot TOWARDS THE GOAL (from %s to %s, distance = %.2f feet), prob of scoring = %.2f" % (self.unique_id, self.pos, pt_in_goal_opt, self.model.distance_to_goal(self.pos), scoring_prob))
-            self.shoot_puck(direction)
-            self.model.puck.prob_of_goal = scoring_prob
-            self.move_around()
+            if self.have_puck:
+                pt_in_goal_opt = self.first_visible_goal_point()
+                if pt_in_goal_opt is None:
+                    direction = Vec2d(tuple(np.random.normal(loc=0.0, scale=5.0, size=2)))
+                    scoring_prob = 0.0
+                else:
+                    direction = Vec2d.from_to(from_pt=self.pos, to_pt=pt_in_goal_opt)
+                    scoring_prob = self.model.prob_of_scoring_from(self.pos)
+                    print("[%s] shot TOWARDS THE GOAL (from %s to %s, distance = %.2f feet), prob of scoring = %.2f" % (self.unique_id, self.pos, pt_in_goal_opt, self.model.distance_to_goal(self.pos), scoring_prob))
+                self.shoot_puck(direction)
+                self.model.puck.prob_of_goal = scoring_prob
+                # self.move_around()
+            # else:
+            #     print("FWD -> tried to *shoot*, but I don't have the puck ************ ")
         elif a == HockeyAction.PASS:
-            print("FWD -> pass ==================================================================")
-            pass  # TODO
+            if self.have_puck:
+                print("FWD -> pass ==================================================================") # TODO
+            # else:
+            #     print("FWD -> tried to *pass*, but I don't have the puck ************ ")
         else:
             return False
         # wrap-up:

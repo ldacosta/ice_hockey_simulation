@@ -40,8 +40,13 @@ class LearnToPlayHockeyProblem(Scenario):
     def sense(self) -> BitString:
         # senses each one of the players in the world, one after the other
         if len(self.players_to_sample) == 0:
-            # sampled everyone. Make world tick, restart.
-            self.hockey_world.datacollector.collect(self)
+            # sampled everyone. Move the puck, make world tick, restart.
+            self.hockey_world.puck.step()
+            self.hockey_world.datacollector.collect(self.hockey_world)
+            # horrible, next 2 lines. Have to put it to reproduce what is done on half-rink. TODO: revisit it!
+            self.hockey_world.schedule.steps += 1
+            self.hockey_world.schedule.time += 1
+            # end-of-TODO
             self.hockey_world.update_running_flag()
             if self.hockey_world.goals_scored > self.goals_before:
                 print("[half-rink] Goal scored! (now %d in total). Resetting positions of agents" % (self.hockey_world.goals_scored))

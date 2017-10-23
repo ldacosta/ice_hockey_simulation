@@ -38,9 +38,11 @@ class HockeyHalfRink(Model):
         """Returns a random position inside of the half-ice."""
         return Point(random.random() * self.width, random.random() * self.height)
 
-    def __init__(self, how_many_defense: int, how_many_offense: int, one_step_in_seconds: float, collect_data_every_secs: float):
+    def __init__(self, how_many_defense: int, how_many_offense: int, one_step_in_seconds: float, collect_data_every_secs: float, record_this_many_minutes: int):
         assert one_step_in_seconds > 0 and how_many_defense >= 0 and how_many_offense >= 0
         Model.__init__(self)
+        self.HOW_MANY_MINUTES_TO_RECORD = record_this_many_minutes
+
         self.one_step_in_seconds = one_step_in_seconds
         # every how many steps do I have to collect data:
         self.collect_every_steps = (1 / self.one_step_in_seconds) * collect_data_every_secs
@@ -49,18 +51,22 @@ class HockeyHalfRink(Model):
         self.schedule = RandomActivation(self)
         # if this was a Grid, the attribute would be called 'self.grid'
         # But because it is continuous, it is called 'self.space'
-        self.space = ContinuousSpace(x_max=self.width, y_max=self.height, torus=False) # SingleGrid(height=self.height, width=self.width, torus=False)
+        self.space = ContinuousSpace(x_max=self.width, y_max=self.height, torus=False)
         # data collector
         self.datacollector = DataCollector(
             model_reporters={
                 "timestamp": lambda m: m.schedule.steps * m.one_step_in_seconds,
+                "puck_is_taken": lambda m: m.puck.is_taken,
                 "goals": lambda m: m.goals_scored,
+                "shots": lambda m: m.shots,
             },
             agent_reporters={
                 "pos_x": lambda agent : agent.pos.x,
                 "pos_y": lambda agent: agent.pos.y,
                 "speed_x": lambda agent: agent.speed.x,
                 "speed_y": lambda agent: agent.speed.y,
+                "last_action": lambda agent: agent.last_action if type(agent) != Puck else "",
+                "have_puck": lambda agent: agent.have_puck if type(agent) != Puck else "",
             }
         )
         #
@@ -78,8 +84,9 @@ class HockeyHalfRink(Model):
         [self.schedule.add(agent) for agent in [self.puck] + self.defense + self.attack]
         # positioning
         self.reset_positions_of_agents()
-        # number of goals scored
+        # number of goals scored, and shots made
         self.goals_scored = 0
+        self.shots = 0
         print("[Grid] Success on initialization")
 
     def reset_positions_of_agents(self):
@@ -156,8 +163,7 @@ class HockeyHalfRink(Model):
             self.datacollector.collect(self)
 
     def update_running_flag(self):
-        HOW_MANY_MINUTES_TO_RECORD = 5 # minutes of play
-        self.running  = (self.schedule.steps <= (1 / TIME_PER_FRAME) * (60 * HOW_MANY_MINUTES_TO_RECORD))
+        self.running  = (self.schedule.steps <= (1 / TIME_PER_FRAME) * (60 * self.HOW_MANY_MINUTES_TO_RECORD))
 
     def step(self):
         '''
@@ -167,8 +173,11 @@ class HockeyHalfRink(Model):
         * A "degagement" happened
         '''
         goals_before = self.goals_scored
+        shots_before = self.shots
         self.schedule.step()
         self.collect_data_if_is_time()
+        if self.shots > shots_before:
+            self.puck.prob_of_goal = 0.0
         if self.goals_scored > goals_before:
             print("[half-rink] Goal scored! (now %d in total). Resetting positions of agents" % (self.goals_scored))
             self.reset_positions_of_agents()

@@ -69,6 +69,7 @@ class Player(ObjectOnIce, Sensor):
         self.have_puck = False
         self.unable_to_play_puck_time = 0.0
         self.speed = self.speed_on_xy()
+        self.last_action = "" # last action performed
 
     def __setattr__(self, name, value):
         self.__dict__[name] = value
@@ -142,27 +143,42 @@ class Player(ObjectOnIce, Sensor):
         if a == HockeyAction.MOVE_RANDOM_SPEED:
             self.current_speed = self.__choose_random_speed__()
             self.move_by_bouncing_from_walls()
+            self.last_action = "Move at random (%.2f feet/sec.) speed" % self.current_speed
         elif a == HockeyAction.SPRINT:
             self.current_speed = self.sprinting_speed
             self.move_by_bouncing_from_walls()
+            self.last_action = "Move at SPRINTING (%.2f feet/sec.) speed" % self.current_speed
         elif a == HockeyAction.SKATE_CALMLY:
             self.current_speed = self.moving_speed
             self.move_by_bouncing_from_walls()
+            self.last_action = "Skate calmly: (%.2f feet/sec.) speed" % self.current_speed
         elif a == HockeyAction.SPIN_RANDOMLY:
             self.spin_around()
+            self.last_action = "Spin randomly"
         elif a == HockeyAction.NOOP:
+            self.last_action = "NOOP"
             pass # doing nothing alright!
         elif a == HockeyAction.SHOOT:
             # _should_ be taken care of by specific kind of player -
             # but if it gets here,, let's throw the puck to a random place.
             self.shoot_puck(direction=Vec2d(tuple(np.random.normal(loc=0.0, scale=5.0, size=2))))
             self.move_around()
+            self.last_action = "Generic SHOOT [are we sure this is OK????]"
         elif a == HockeyAction.PASS:
+            self.last_action = "Generic PASS [are we sure this is OK????]"
             pass  # TODO
         elif a == HockeyAction.CHASE_PUCK:
             self.chase_puck(only_when_my_team_doesnt_have_it=True) # TODO: verify flag
+            self.last_action = "Chase puck"
         elif a == HockeyAction.GRAB_PUCK:
-            self.model.puck_request_by(self)
+            if self.have_puck:
+                self.last_action = "SUCCESSFUL Grab puck (already had it!)"
+            elif self.can_reach_puck():
+                self.model.puck_request_by(self)
+                self.last_action = "SUCCESSFUL Grab puck"
+            else:
+                self.last_action = "UNSUCCESSFUL Grab puck"
+
             # if (self.have_puck):
             #     print("[%s] I JUST TOOK the puck!" % (self.unique_id))
         else:

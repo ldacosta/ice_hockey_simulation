@@ -30,7 +30,7 @@ class ObjectOnIce(Agent):
     def is_moving(self) -> bool:
         return not self.speed.is_zero()
 
-    def move_by_bouncing_from_walls(self, prob_of_score_on_goal: float = 0.0):
+    def move_by_bouncing_from_walls(self, prob_of_score_on_goal_opt: Optional[float] = None):
         """
         Moves around the ice, bouncing from walls and from the goal.
         Args:
@@ -41,6 +41,7 @@ class ObjectOnIce(Agent):
         """
         half_size = self.size/2
         def handle_walls(curr_position: float, curr_speed: float, min_value: float, max_value: float, goal_on_max: bool) -> Tuple[bool, Tuple[float, float]]:
+
             new_position = curr_position + curr_speed * TIME_PER_FRAME
             new_speed = curr_speed
             goal = False
@@ -48,7 +49,13 @@ class ObjectOnIce(Agent):
                 new_position = 2 * (min_x + half_size) - new_position
                 new_speed *= -1
             elif new_position >= (max_value - half_size):
+                # this was a shot!
                 if goal_on_max:
+                    # sanity check
+                    assert (prob_of_score_on_goal_opt is not None)
+                    # ok then:
+                    prob_of_score_on_goal = prob_of_score_on_goal_opt
+                    self.model.shots += 1
                     if prob_of_score_on_goal > 0:
                         print("With probability %.2f we will see a goal now" % (prob_of_score_on_goal))
                         dice_throw = random()
@@ -64,6 +71,7 @@ class ObjectOnIce(Agent):
                     # formula is: (max_value - self.size) - (new_position - (max_value - self.size))
                     new_position = 2 * (max_value - half_size) - new_position
                     new_speed *= -1
+
             return (goal, (new_position, new_speed))
         #
         curr_x, curr_y = self.pos
@@ -82,7 +90,7 @@ class ObjectOnIce(Agent):
             curr_speed=self.speed[0],
             min_value = min_x,
             max_value=max_x,
-            goal_on_max=(max_x == self.model.GOALIE_X))
+            goal_on_max=(prob_of_score_on_goal_opt is not None) and (max_x == self.model.GOALIE_X))
         if is_goal:
             new_y = 0
             new_speed_y = 0

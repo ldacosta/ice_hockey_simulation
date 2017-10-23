@@ -25,11 +25,11 @@ class Puck(ObjectOnIce):
         self.__dict__[name] = value
 
     def move_around(self):
-        self.move_by_bouncing_from_walls(prob_of_score_on_goal=self.prob_of_goal)
+        self.move_by_bouncing_from_walls(prob_of_score_on_goal_opt=self.prob_of_goal)
 
     def set_free(self):
         self.is_taken = False
-        self.prob_of_goal = 0.0
+        # self.prob_of_goal = 0.0
 
     def step(self):
         # if the puck is taken it will move with the carrier
