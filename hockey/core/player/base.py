@@ -26,12 +26,16 @@ class Player(ObjectOnIce, Sensor):
     # 'height' is in feet
     MIN_HEIGHT = 4 * INCHES_IN_FOOT
     MAX_HEIGHT = 7 * INCHES_IN_FOOT
-    # 'reach' is in feet
-    MIN_REACH = 3
-    MAX_REACH = 6
     # power: serves for puck possession and for shooting
     MIN_POWER = 1
     MAX_POWER = 10
+    # speed of puck. In feet/sec. (miles / hour to feet / sec is the transformation).
+    SHOT_MIN_SPEED = 80 * 1.4667
+    SHOT_MAX_SPEED = 110 * 1.4667
+    PASS_SPEED = SHOT_MIN_SPEED / 2
+    ## this is how to convert 'power' into speed of shot:
+    SHOT_a = (SHOT_MAX_SPEED - SHOT_MIN_SPEED) / (MAX_POWER - MIN_POWER)
+    SHOT_b = SHOT_MIN_SPEED - MIN_POWER * SHOT_a
     # time that takes a player to make a pass (or shoot a puck). In seconds.
     TIME_TO_PASS_OR_SHOOT = 0.75
 
@@ -238,11 +242,12 @@ class Player(ObjectOnIce, Sensor):
         return False
 
     def shoot_puck(self, direction: Vec2d) -> bool:
-        return self.__send_puck__(puck_speed_vector=direction, speed_multiplier=self.current_speed * 2) # TODO: vary speed
+        speed = Player.SHOT_a * self.power + Player.SHOT_b
+        return self.__send_puck__(puck_speed_vector=direction, speed_multiplier=speed)
 
     def pass_puck(self, this_position: Point) -> bool:
         direction = Vec2d.from_to(self.pos, this_position)
-        return self.__send_puck__(puck_speed_vector=direction, speed_multiplier=self.current_speed * 2) # TODO: vary speed
+        return self.__send_puck__(puck_speed_vector=direction, speed_multiplier=Player.PASS_SPEED) # TODO: vary speed? Maybe?
 
     def vector_looking_at(self) -> Vec2d:
         return Vec2d.from_angle(self.angle_looking_at)
