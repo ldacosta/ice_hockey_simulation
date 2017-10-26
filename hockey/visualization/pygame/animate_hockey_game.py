@@ -1,3 +1,5 @@
+
+import sys
 import pygame
 import random
 import pandas as pd
@@ -5,8 +7,9 @@ import time
 import numpy as np
 
 from geometry.point import Point
+from geometry.vector import Vec2d
 from hockey.core.model import TIME_PER_FRAME
-from hockey.behaviour.core.xcs_brain import LearnToPlayHockeyProblem
+from hockey.behaviour.core.hockey_scenario import BasicForwardProblem
 from hockey.core.simulator import Simulator, MesaModelSimulator, ScenarioSimulator
 from hockey.core.half_rink import HockeyHalfRink
 from hockey.visualization.pygame.half_rink import HalfRinklPygameRenderable
@@ -19,14 +22,14 @@ from hockey.visualization.pygame.global_def import HALF_ICE_WIDTH, HALF_ICE_HEIG
 
 if __name__ == "__main__":
     # field
-    DATA_EVERY_SECS = TIME_PER_FRAME # .1 # 1 / 30
-    RECORD_THIS_MANY_MINUTES = 60
+    DATA_EVERY_SECS = .5 # TIME_PER_FRAME # .1 # 1 / 30
+    RECORD_THIS_MANY_MINUTES = 60 * 2 # * 6 # 60' == 1 game
     hockey_rink = HockeyHalfRink(how_many_offense=1, how_many_defense=0, one_step_in_seconds=TIME_PER_FRAME, collect_data_every_secs=DATA_EVERY_SECS, record_this_many_minutes=RECORD_THIS_MANY_MINUTES)
 
-    run_simulation = True
+    run_simulation = False
     if run_simulation:
         mesa_simulator = MesaModelSimulator(mesa_model=hockey_rink)
-        hockey_problem = LearnToPlayHockeyProblem(hockey_world=hockey_rink)
+        hockey_problem = BasicForwardProblem(hockey_world=hockey_rink)
         xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem)
         # mesa_simulator.run()
         xcs_simulator.run()
@@ -49,10 +52,12 @@ if __name__ == "__main__":
     surface = pygame.display.set_mode((HALF_ICE_WIDTH, HALF_ICE_HEIGHT), 0, 32)
     surface.fill(THECOLORS['black'])
 
-    FPS = 30
+    # FPS = 30
 
-    DISPLAY_EVERY_SECS = .5
+    DISPLAY_EVERY_SECS = 2 * DATA_EVERY_SECS #5.0 # .5 #
+    assert DISPLAY_EVERY_SECS >= DATA_EVERY_SECS
     steps_between_displays = round(DISPLAY_EVERY_SECS / DATA_EVERY_SECS)
+    print("I have data recorded every %.2f seconds, I want to display what happened every %.2f seconds, so I will display 1 out of %d frames" % (DATA_EVERY_SECS, DISPLAY_EVERY_SECS, steps_between_displays))
     SPEED_FACTOR = -1 # -1 means: go as fast as possible!
     if SPEED_FACTOR > 0:
         total_time_between_frames = (DISPLAY_EVERY_SECS * 1000) / SPEED_FACTOR
@@ -73,13 +78,20 @@ if __name__ == "__main__":
         attackers_seen = 0
         for idx, row in df_step.iterrows():
             agent_id = row['AgentID']
-            # TODO: update speed too!
             the_pos = Point(x=row['pos_x'], y=row['pos_y'])
+            the_speed = Point(x=row['speed_x'], y=row['speed_y'])
+            v = Vec2d.origin_to(a_pt=the_speed)
+            speed_angle = v.angle_with_x_axis()
+            speed_amplitude = v.norm()
             if agent_id.startswith("defense"):
                 hockey_rink.defense[defenses_seen].pos = the_pos
+                hockey_rink.defense[defenses_seen].angle_looking_at = speed_angle
+                hockey_rink.defense[defenses_seen].current_speed = speed_amplitude
                 defenses_seen += 1
             elif agent_id.startswith("forward"):
                 hockey_rink.attack[attackers_seen].pos = the_pos
+                hockey_rink.attack[attackers_seen].angle_looking_at = speed_angle
+                hockey_rink.attack[attackers_seen].current_speed = speed_amplitude
                 attackers_seen += 1
             elif agent_id.startswith("puck"):
                 hockey_rink.puck.pos = the_pos
@@ -89,7 +101,10 @@ if __name__ == "__main__":
         times_between_frames.append(tick_time)
         # print("this many: %.2f milliseconds since last update" % (tick_time))
         surface.fill(THECOLORS['black']) # this is basically a CLEAR. TODO: can we do something better????
-        pygame.event.get()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
 
         pygame_render(hockey_rink_renderable.representation(), surface)
         pygame.display.update()
@@ -100,7 +115,7 @@ if __name__ == "__main__":
                 time.sleep(sleep_this_much)
         if len(times_between_frames) == report_every_frames:
             time_in_ms = np.mean(times_between_frames)
-            print("Avg time (last %d frames, ~ %d seconds) between frames = %.2f ms." % (report_every_frames, report_every_this_many_secs, time_in_ms))
+            print("Avg time (last %d frames, %.2f seconds in simulation time, ~ %d seconds in real time) between frames = %.2f ms." % (report_every_frames, report_every_frames * DISPLAY_EVERY_SECS, report_every_this_many_secs, time_in_ms))
             report_every_frames = (1000 // time_in_ms) * report_every_this_many_secs # so I will report approx. once per second
             times_between_frames = []
 
