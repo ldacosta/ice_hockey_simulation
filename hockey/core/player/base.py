@@ -23,7 +23,7 @@ class Player(ObjectOnIce, Sensor):
     MAX_SPEED_MOVING = 22
     MIN_SPEED_SPRINTING = 29
     MAX_SPEED_SPRINTING = 44
-    #
+    # 'reach' is in feet
     MIN_REACH = 3
     MAX_REACH = 6
     # power: serves for puck possession and for shooting
