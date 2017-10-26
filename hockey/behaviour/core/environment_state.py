@@ -51,3 +51,10 @@ class EnvironmentState(CoreEnvironmentState):
                 the_angle = angle_between(v1 = v_radius, v2 = vector_me_to_puck)
                 return the_angle.value <= math.pi
 
+    def distance_to_puck(self) -> float:
+        """Distance (in feet) of player that generated this state to the puck."""
+        return self.__vector_me_to_puck__().norm()
+
+    def distance_to_goal(self) -> float:
+        """Distance (in feet) of player that generated this state to the goal."""
+        return self.me.model.distance_to_goal(self.me.pos)
