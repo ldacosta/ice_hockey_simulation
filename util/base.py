@@ -44,3 +44,22 @@ def choose_first_option_by_roulette(weight_1: float, weight_2: float) -> bool:
         True if first option is the chosen. False otherwise.
     """
     return choose_by_roulette(weights = [weight_1, weight_2]) == 0
+
+
+def stick_length_for_height(height_in_inches: int) -> int:
+    """
+    Calculates stick length (in inches) for different heights of players.
+    Inspiration from http://www.hockeysticks.co.uk/hockey_stick_length.htm
+
+    Args:
+        height_in_inches: height to players, in inches.
+
+    Returns:
+        Recommended stick length, in inches.
+
+    """
+    assert height_in_inches >= (3 * 4) # we are talking about adult players, so... 3 feet is minimum height... That ok?
+    assert height_in_inches <= (8 * 4) # 8 feet is kind of the maximum height for a player... no?
+    a = 2 / 7
+    b = 17.29
+    return int(round(a * height_in_inches + b))
