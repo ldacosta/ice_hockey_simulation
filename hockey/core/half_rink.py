@@ -65,6 +65,7 @@ class HockeyHalfRink(Model):
                 "pos_y": lambda agent: agent.pos.y,
                 "speed_x": lambda agent: agent.speed.x,
                 "speed_y": lambda agent: agent.speed.y,
+                "speed_magnitude": lambda agent: agent.speed.norm(),
                 "last_action": lambda agent: agent.last_action if type(agent) != Puck else "",
                 "have_puck": lambda agent: agent.have_puck if type(agent) != Puck else "",
             }
@@ -135,6 +136,9 @@ class HockeyHalfRink(Model):
 
     def distance_to_goal(self, a_pos: Point) -> float:
         return Vec2d.from_to(from_pt=a_pos, to_pt=self.GOALIE_CENTER).norm()
+
+    def distance_to_puck(self, a_pos: Point) -> float:
+        return Vec2d.from_to(from_pt=a_pos, to_pt=self.puck.pos).norm()
 
     def give_puck_to(self, agent):
         current_owner = self.who_has_the_puck()
