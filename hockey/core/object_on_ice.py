@@ -3,10 +3,11 @@ import uuid
 
 from random import random
 from mesa import Agent
+import numpy as np
 from typing import Optional, Tuple
 from geometry.point import Point
 from geometry.vector import Vec2d
-from hockey.core.model import TIME_PER_FRAME
+from hockey.core.model import TIME_PER_FRAME, FEET_IN_METER, GRAVITY_ACCELERATION
 
 class ObjectOnIce(Agent):
     """Anything that goes on ice follows this behaviour."""
@@ -30,7 +31,7 @@ class ObjectOnIce(Agent):
     def is_moving(self) -> bool:
         return not self.speed.is_zero()
 
-    def move_by_bouncing_from_walls(self, prob_of_score_on_goal_opt: Optional[float] = None):
+    def move_by_bouncing_from_walls(self, prob_of_score_on_goal_opt: Optional[float] = None, friction_constant_opt: Optional[float] = None):
         """
         Moves around the ice, bouncing from walls and from the goal.
         Args:
@@ -73,6 +74,18 @@ class ObjectOnIce(Agent):
                     new_speed *= -1
 
             return (goal, (new_position, new_speed))
+        # First, apply deceleration because of friction
+        if friction_constant_opt is not None:
+            friction = friction_constant_opt
+            # for reference: https://www.youtube.com/watch?v=y1kqH63-828
+            if self.speed.x != 0:
+                new_speed_x = np.sign(self.speed.x) * \
+                              max(0.0, (abs(self.speed.x*FEET_IN_METER) - GRAVITY_ACCELERATION*friction)/FEET_IN_METER)
+                self.speed.x = new_speed_x
+            if self.speed.y != 0:
+                new_speed_y = np.sign(self.speed.y) * \
+                              max(0.0, (abs(self.speed.y*FEET_IN_METER) - GRAVITY_ACCELERATION*friction)/FEET_IN_METER)
+                self.speed.y = new_speed_y
         #
         curr_x, curr_y = self.pos
         if (curr_y >= self.model.GOALIE_Y_BOTTOM) and (curr_y <= self.model.GOALIE_Y_TOP):

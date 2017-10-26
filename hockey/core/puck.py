@@ -5,6 +5,11 @@ from hockey.core.object_on_ice import ObjectOnIce
 class Puck(ObjectOnIce):
     """How does a Puck behave?"""
 
+    KINETIC_FRICTION_COEF = 0.15 # from https://hypertextbook.com/facts/2004/GennaAbleman.shtml
+
+    # Elasticity represents the loss of speed a particle experiences when it hits a boundary.
+    ELASTICITY = 0.77 # inspired by http://www.petercollingridge.co.uk/book/export/html/6
+
     def __init__(self, hockey_world_model):
         # initially, the puck goes around randomly at low speed
         speeds = tuple(np.random.normal(loc=0.0, scale=5.0, size=2))
@@ -25,7 +30,10 @@ class Puck(ObjectOnIce):
         self.__dict__[name] = value
 
     def move_around(self):
-        self.move_by_bouncing_from_walls(prob_of_score_on_goal_opt=self.prob_of_goal)
+        self.move_by_bouncing_from_walls(
+            prob_of_score_on_goal_opt=self.prob_of_goal,
+            friction_constant_opt=0.15 # reference: https://hypertextbook.com/facts/2004/GennaAbleman.shtml
+        )
 
     def set_free(self):
         self.is_taken = False
