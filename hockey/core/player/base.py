@@ -13,7 +13,7 @@ from core.environment_state import EnvironmentState
 from hockey.behaviour.core.action import HockeyAction
 from hockey.core.model import TIME_PER_FRAME
 from hockey.core.object_on_ice import ObjectOnIce
-from util.base import normalize_to
+from util.base import random_between, stick_length_for_height, INCHES_IN_FOOT
 
 class Player(ObjectOnIce, Sensor):
     """Hockey Player."""
@@ -23,6 +23,9 @@ class Player(ObjectOnIce, Sensor):
     MAX_SPEED_MOVING = 22
     MIN_SPEED_SPRINTING = 29
     MAX_SPEED_SPRINTING = 44
+    # 'height' is in feet
+    MIN_HEIGHT = 4 * INCHES_IN_FOOT
+    MAX_HEIGHT = 7 * INCHES_IN_FOOT
     # 'reach' is in feet
     MIN_REACH = 3
     MAX_REACH = 6
@@ -34,38 +37,23 @@ class Player(ObjectOnIce, Sensor):
 
     def __choose_random_speed__(self) -> float:
         """Returns a speed between 'moving' and 'sprinting' speeds."""
-        return normalize_to(
-            random.random(),
-            new_min=self.moving_speed, new_max=self.sprinting_speed,
-            old_min=0, old_max=1)
+        return random_between(self.moving_speed, self.sprinting_speed)
 
 
     def __init__(self, prefix_on_id: str, hockey_world_model, brain: Brain):
+        self.height = random_between(Player.MIN_HEIGHT, Player.MAX_HEIGHT)
+        self.reach = stick_length_for_height(self.height)
         self.angle_looking_at = AngleInRadians.random()
-        self.moving_speed = normalize_to(
-            random.random(),
-            new_min = Player.MIN_SPEED_MOVING, new_max = Player.MAX_SPEED_MOVING,
-            old_min = 0, old_max = 1)
-        self.sprinting_speed = normalize_to(
-            random.random(),
-            new_min = Player.MIN_SPEED_SPRINTING, new_max = Player.MAX_SPEED_SPRINTING,
-            old_min = 0, old_max = 1)
+        self.moving_speed = random_between(Player.MIN_SPEED_MOVING, Player.MAX_SPEED_MOVING)
+        self.sprinting_speed = random_between(Player.MIN_SPEED_SPRINTING, Player.MAX_SPEED_SPRINTING)
         self.current_speed = self.__choose_random_speed__()
-        # power: serves for puck possession and for shooting
-        self.power = normalize_to(
-            random.random(),
-            new_min = Player.MIN_POWER, new_max = Player.MAX_POWER,
-            old_min = 0, old_max = 1)
+        self.power = random_between(Player.MIN_POWER, Player.MAX_POWER)
         self.brain = brain
         ObjectOnIce.__init__(self, prefix_on_id, hockey_world_model,
                          size=3, # feet
                          pos_opt=None,
                          speed_opt=self.speed_on_xy())
         Sensor.__init__(self, environment=hockey_world_model)
-        self.reach = normalize_to(
-            random.random(),
-            new_min = Player.MIN_REACH, new_max = Player.MAX_REACH,
-            old_min = 0, old_max = 1)
         self.have_puck = False
         self.unable_to_play_puck_time = 0.0
         self.speed = self.speed_on_xy()

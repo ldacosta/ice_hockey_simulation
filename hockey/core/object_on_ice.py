@@ -7,7 +7,8 @@ import numpy as np
 from typing import Optional, Tuple
 from geometry.point import Point
 from geometry.vector import Vec2d
-from hockey.core.model import TIME_PER_FRAME, FEET_IN_METER, GRAVITY_ACCELERATION
+from hockey.core.model import TIME_PER_FRAME
+from util.base import FEET_IN_METER, GRAVITY_ACCELERATION
 
 class ObjectOnIce(Agent):
     """Anything that goes on ice follows this behaviour."""
