@@ -5,17 +5,18 @@ from mesa.datacollection import DataCollector
 from mesa.space import ContinuousSpace
 from mesa.time import RandomActivation
 from geometry.point import Point
+from geometry.vector import Vec2d
 
 from util.base import choose_first_option_by_roulette
 from util.geometry.lines import cells_between
 from hockey.core.puck import Puck
-from typing import Optional, Tuple
+from typing import Optional
 
 from hockey.behaviour.core.rule_based_brain import RuleBasedBrain
 from hockey.core.player.base import Player
 from hockey.core.player.defense import Defense
 from hockey.core.player.forward import Forward
-
+from hockey.core.model import TIME_PER_FRAME
 
 class HockeyHalfRink(Model):
     """The attacking side of a Hockey Rink."""
@@ -26,6 +27,7 @@ class HockeyHalfRink(Model):
     GOALIE_WIDTH = 6
     GOALIE_Y_BOTTOM = HEIGHT_ICE / 2 - GOALIE_WIDTH / 2
     GOALIE_Y_TOP = GOALIE_Y_BOTTOM + GOALIE_WIDTH
+    GOALIE_CENTER = Point(GOALIE_X, (GOALIE_Y_TOP + GOALIE_Y_BOTTOM) / 2)
     OFF_FACEOFF_X = GOALIE_X - 20
     BLUE_LINE_X = 25
     NEUTRAL_FACEOFF_X = BLUE_LINE_X - 2
@@ -36,18 +38,38 @@ class HockeyHalfRink(Model):
         """Returns a random position inside of the half-ice."""
         return Point(random.random() * self.width, random.random() * self.height)
 
-    def __init__(self, how_many_defense: int, how_many_offense: int):
+    def __init__(self, how_many_defense: int, how_many_offense: int, one_step_in_seconds: float, collect_data_every_secs: float, record_this_many_minutes: int):
+        assert one_step_in_seconds > 0 and how_many_defense >= 0 and how_many_offense >= 0
         Model.__init__(self)
+        self.HOW_MANY_MINUTES_TO_RECORD = record_this_many_minutes
+
+        self.one_step_in_seconds = one_step_in_seconds
+        # every how many steps do I have to collect data:
+        self.collect_every_steps = (1 / self.one_step_in_seconds) * collect_data_every_secs
         self.height = HockeyHalfRink.HEIGHT_ICE
         self.width = HockeyHalfRink.WIDTH_HALF_ICE
         self.schedule = RandomActivation(self)
         # if this was a Grid, the attribute would be called 'self.grid'
         # But because it is continuous, it is called 'self.space'
-        self.space = ContinuousSpace(x_max=self.width, y_max=self.height, torus=False) # SingleGrid(height=self.height, width=self.width, torus=False)
-        # TODO: properly set up the DataCollector
-        # self.datacollector = DataCollector(
-        #     {"x": lambda a: a.pos[0], "y": lambda a: a.pos[1]})# For testing purposes, agent's individual x and y
-        self.datacollector = DataCollector()
+        self.space = ContinuousSpace(x_max=self.width, y_max=self.height, torus=False)
+        # data collector
+        self.datacollector = DataCollector(
+            model_reporters={
+                "timestamp": lambda m: m.schedule.steps * m.one_step_in_seconds,
+                "puck_is_taken": lambda m: m.puck.is_taken,
+                "goals": lambda m: m.goals_scored,
+                "shots": lambda m: m.shots,
+            },
+            agent_reporters={
+                "pos_x": lambda agent : agent.pos.x,
+                "pos_y": lambda agent: agent.pos.y,
+                "speed_x": lambda agent: agent.speed.x,
+                "speed_y": lambda agent: agent.speed.y,
+                "speed_magnitude": lambda agent: agent.speed.norm(),
+                "last_action": lambda agent: agent.last_action if type(agent) != Puck else "",
+                "have_puck": lambda agent: agent.have_puck if type(agent) != Puck else "",
+            }
+        )
         #
         self.goal_position = (HockeyHalfRink.GOALIE_X,(HockeyHalfRink.GOALIE_Y_BOTTOM, HockeyHalfRink.GOALIE_Y_TOP))
         self.count_defense = how_many_defense
@@ -55,18 +77,26 @@ class HockeyHalfRink(Model):
         # Set up agents
         # init puck position
         self.puck = Puck(hockey_world_model=self)
-        self.space.place_agent(self.puck, pos = self.get_random_position())
         # defensive players: creation and random positioning
         self.defense = [Defense(hockey_world_model=self, brain=RuleBasedBrain()) for _ in range(self.count_defense)]
-        [self.space.place_agent(defense_player, pos = self.get_random_position()) for defense_player in self.defense]
         # offensive players: creation and random positioning
         self.attack = [Forward(hockey_world_model=self, brain=RuleBasedBrain()) for _ in range(self.count_attackers)]
-        [self.space.place_agent(attacker, pos = self.get_random_position()) for attacker in self.attack]
         # put everyone on the scheduler:
         [self.schedule.add(agent) for agent in [self.puck] + self.defense + self.attack]
-        # number of goals scored
+        # positioning
+        self.reset_positions_of_agents()
+        # number of goals scored, and shots made
         self.goals_scored = 0
+        self.shots = 0
         print("[Grid] Success on initialization")
+
+    def reset_positions_of_agents(self):
+        """Sets the players positions as at the beginning of an iteration."""
+
+        self.space.place_agent(self.puck, pos = self.get_random_position())
+        [self.space.place_agent(defense_player, pos = Point(self.GOALIE_X, self.get_random_position().y)) for defense_player in self.defense]
+        [self.space.place_agent(attacker, pos = Point(self.BLUE_LINE_X, self.get_random_position().y)) for attacker in self.attack]
+
 
     def puck_request_by(self, agent):
         current_owner = self.who_has_the_puck()
@@ -79,11 +109,41 @@ class HockeyHalfRink(Model):
                 # print("[puck_request_by(%s)]: owner (strength %.2f) lost the puck to me (strength %.2f)" % (agent.unique_id, power_holder, power_requester))
                 self.give_puck_to(agent)
 
+    def prob_of_scoring_from_distance(self, distance_to_goal: float) -> float:
+        # based on http://www.omha.net/news_article/show/667329-the-science-of-scoring
+        if distance_to_goal <= 10:
+            return 0.21
+        elif distance_to_goal <= 20:
+            return 0.34
+        elif distance_to_goal <= 30:
+            return 0.18
+        elif distance_to_goal <= 40:
+            return 0.11
+        elif distance_to_goal <= 50:
+            return 0.07
+        elif distance_to_goal <= 60:
+            return 0.05
+        else:
+            return 0.00
+
+    def prob_of_scoring_from(self, a_pos: Point) -> float:
+        """Probability of scoring from a certain point on the half-ice."""
+        if a_pos.x > self.GOALIE_X:
+            # behind the goal. Pas de chance.
+            return 0.0
+        else:
+            return self.prob_of_scoring_from_distance(self.distance_to_goal(a_pos))
+
+    def distance_to_goal(self, a_pos: Point) -> float:
+        return Vec2d.from_to(from_pt=a_pos, to_pt=self.GOALIE_CENTER).norm()
+
+    def distance_to_puck(self, a_pos: Point) -> float:
+        return Vec2d.from_to(from_pt=a_pos, to_pt=self.puck.pos).norm()
+
     def give_puck_to(self, agent):
         current_owner = self.who_has_the_puck()
         if current_owner is not None:
-            current_owner.have_puck = False
-            self.puck.is_taken = False
+            current_owner.release_puck()
         agent.have_puck = True
         self.puck.is_taken = True
         self.space.place_agent(self.puck, pos=agent.pos)
@@ -99,6 +159,16 @@ class HockeyHalfRink(Model):
     def is_puck_taken(self) -> bool:
         return not (self.who_has_the_puck() is None)
 
+
+    def collect_data_if_is_time(self):
+        # self.schedule.steps
+        num_data_collected = len(self.datacollector.model_vars['goals'])
+        if self.schedule.steps >= (num_data_collected + 1) * self.collect_every_steps:
+            self.datacollector.collect(self)
+
+    def update_running_flag(self):
+        self.running  = (self.schedule.steps <= (1 / TIME_PER_FRAME) * (60 * self.HOW_MANY_MINUTES_TO_RECORD))
+
     def step(self):
         '''
         Run one step of the model. 
@@ -106,8 +176,16 @@ class HockeyHalfRink(Model):
         * A Goal happened.
         * A "degagement" happened
         '''
+        goals_before = self.goals_scored
+        shots_before = self.shots
         self.schedule.step()
-        self.datacollector.collect(self)
+        self.collect_data_if_is_time()
+        if self.shots > shots_before:
+            self.puck.prob_of_goal = 0.0
+        if self.goals_scored > goals_before:
+            print("[half-rink] Goal scored! (now %d in total). Resetting positions of agents" % (self.goals_scored))
+            self.reset_positions_of_agents()
+        self.update_running_flag()
 
     def first_visible_goal_point_from(self, a_position: Point) -> Optional[Point]:
         """From a certain position, can I see the goal?"""
@@ -123,7 +201,7 @@ class HockeyHalfRink(Model):
         while (not found_clear_path) and (y_in_goal < self.goal_position[1][1]):
             y_in_goal += 1
             #
-            cells_on_way = cells_between(tuple(map(round, a_position.as_tuple())), (goal_x, y_in_goal))
+            cells_on_way = cells_between(a_position.as_tuple(), (goal_x, y_in_goal))
             # let's visit all cells to see if it's free
             free_path = True
             idx_cell_in_way = -1
