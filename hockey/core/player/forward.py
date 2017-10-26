@@ -43,7 +43,9 @@ class Forward(Player):
 
 
     def apply_actions(self, actions: List[HockeyAction]) -> bool:
-        if not [self.__parse_action_fwd__(an_action) for an_action in actions][-1]:
+        if [self.__parse_action_fwd__(an_action) for an_action in actions][-1]:
+            return True
+        else:
             return Player.apply_actions(self, actions)
 
     #
