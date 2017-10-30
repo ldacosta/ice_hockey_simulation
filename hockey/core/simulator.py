@@ -46,7 +46,19 @@ class ScenarioSimulator(Simulator):
 
     def run(self):
         self.running = True
-        steps, reward, seconds, model = xcs.test(scenario=self.scenario) # algorithm=XCSAlgorithm,
+        algorithm = xcs.XCSAlgorithm()
+
+        # # Default parameter settings in test()
+        # algorithm.exploration_probability = .3
+        # # Modified parameter settings
+        # algorithm.ga_threshold = 1
+        # algorithm.crossover_probability = .5
+        # algorithm.do_action_set_subsumption = True
+        # algorithm.do_ga_subsumption = False
+        # algorithm.wildcard_probability = .998
+        # algorithm.deletion_threshold = 1
+        # algorithm.mutation_probability = .002
+        steps, reward, seconds, model = xcs.test(algorithm, scenario=self.scenario) # algorithm=XCSAlgorithm,
         self.running = False
 
     def is_running(self) -> bool:
