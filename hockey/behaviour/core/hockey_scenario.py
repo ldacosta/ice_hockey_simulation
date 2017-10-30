@@ -83,11 +83,31 @@ class LearnToPlayHockeyProblem(Scenario, metaclass=abc.ABCMeta):
                 print("[====> half-rink <*******] Goal scored! (now %d in total). Resetting positions of agents" % (self.hockey_world.goals_scored))
                 self.hockey_world.reset_positions_of_agents()
         self.player_sensing = self.players_to_sample[self.player_sensing_idx]
-        return BitstringEnvironmentState(full_state=self.player_sensing.sense()).as_bitstring()
+        self.player_sensing.update_unable_time()
+        bit_string = BitstringEnvironmentState(full_state=self.player_sensing.sense()).as_bitstring()
+        self.xxx_can_reach_puck = bool(bit_string[2])
+        if self.xxx_can_reach_puck:
+            print("I CAN REACH PUCK!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        assert self.player_sensing.can_reach_puck() == self.xxx_can_reach_puck
+        return bit_string
 
 
 class BasicForwardProblem(LearnToPlayHockeyProblem):
     """Rewards for a would-be attacker."""
+
+    reward_get_closer_to_goal = 1  # LearnToPlayHockeyProblem.REWARD_FOR_GOAL/1000
+    reward_get_closer_to_puck = reward_get_closer_to_goal
+    reward_shot = LearnToPlayHockeyProblem.REWARD_FOR_GOAL / 30  # TODO: we should reward relative to distance from goal...
+    reward_get_puck = reward_shot / 10  # reward_get_closer_to_puck * 100
+    bonus_for_having_puck = 10 * max(reward_get_closer_to_goal, reward_get_closer_to_puck) + 1
+    punishment_action_failed = -reward_get_closer_to_goal/2
+
+    def __init__(self, hockey_world: HockeyHalfRink):
+        LearnToPlayHockeyProblem.__init__(self, hockey_world)
+        print("reward_get_closer_to_goal = %.2f" % (self.reward_get_closer_to_goal))
+        print("reward_get_closer_to_puck = %.2f" % (self.reward_get_closer_to_puck))
+        print("reward_shot = %.2f" % (self.reward_shot))
+        print("bonus_for_having_puck = %.2f" % (self.bonus_for_having_puck))
 
     def execute(self, action) -> Optional[float]:
         # first, let's get the player to execute this action on his/her environment:
@@ -95,50 +115,58 @@ class BasicForwardProblem(LearnToPlayHockeyProblem):
             return None
         else:
             # scheme of rewards
-            reward_get_closer_to_goal = LearnToPlayHockeyProblem.REWARD_FOR_GOAL/1000
-            reward_get_closer_to_puck = reward_get_closer_to_goal
-            reward_shot = LearnToPlayHockeyProblem.REWARD_FOR_GOAL/30 # TODO: we should reward relative to distance from goal...
-            reward_get_puck = reward_shot / 10 # reward_get_closer_to_puck * 100
             #
             distance_to_goal_before = self.hockey_world.distance_to_goal(self.player_sensing.pos)
             distance_to_puck_before = self.hockey_world.distance_to_puck(self.player_sensing.pos)
             have_puck_before = self.player_sensing.have_puck
-            self.player_sensing.apply_actions([action]) # TODO: should I pensalize for impossible actions (eg, shooting when puck is not owned. Function returns 'False' in that case).
+            action_successful = self.player_sensing.apply_actions([action]) # TODO: should I penalize for impossible actions (eg, shooting when puck is not owned. Function returns 'False' in that case).
             distance_to_goal_after = self.hockey_world.distance_to_goal(self.player_sensing.pos)
             distance_to_puck_after = self.hockey_world.distance_to_puck(self.player_sensing.pos)
             have_puck_after = self.player_sensing.have_puck
-            # let's do it!
-            if self.apply_rewards_for_goal:
-                print("APPLY REWARD FOR GOAL => reward = %.2f" % (LearnToPlayHockeyProblem.REWARD_FOR_GOAL))
-                return LearnToPlayHockeyProblem.REWARD_FOR_GOAL
-            elif self.apply_rewards_for_shot:
-                print("APPLY REWARD FOR SHOT => reward = %.2f" % (reward_shot))
-                return reward_shot
-            elif have_puck_before:
-                if not have_puck_after:
-                    print("LOST PUCK => reward = %.2f" % (-reward_get_puck))
-                    # return -reward_get_puck
+            # sanity checking
+            if self.xxx_can_reach_puck:
+                print("I COULD reach puck and the action that I got suggested is %s (and the success bit is %s)" % (action, action_successful))
+            if action == HockeyAction.GRAB_PUCK:
+                assert (action_successful == have_puck_after)
+                # if not action_successful and have_puck_after:
+                #     print("==============> Tried to grab puck and the result was %s (and have_puck_after == %s)" % (action_successful, have_puck_after))
+
+            # if action was unsuccessful, let's clear the deck:
+            if not action_successful:
+                reward = self.punishment_action_failed
+            else:
+                # let's do it!
+                reward = 0 # TODO: seriously???? I thought it would be None !
+                if self.apply_rewards_for_goal:
+                    print("APPLY REWARD FOR GOAL")
+                    reward = LearnToPlayHockeyProblem.REWARD_FOR_GOAL
+                elif self.apply_rewards_for_shot:
+                    print("APPLY REWARD FOR SHOT")
+                    reward = self.reward_shot
                 else:
-                    # I still have the puck. Did I get closer to goal?
-                    if distance_to_goal_before > distance_to_goal_after:
-                        print("HAVE PUCK, GOT CLOSER TO GOAL => reward = %.2f" % (reward_get_closer_to_goal))
-                        return reward_get_closer_to_goal
-                    # elif distance_to_goal_before < distance_to_goal_after:
-                    #     print("HAVE PUCK, GOT FARTHER FROM GOAL => reward = %.2f" % (-reward_get_closer_to_goal))
-                    #     return -reward_get_closer_to_goal
-            else: # I did not have the puck before!
-                if have_puck_after:
-                    print("GOT PUCK => reward = %.2f" % (reward_get_puck))
-                    return reward_get_puck
-                else:
-                    # didn't have puck before, I don't have it now. Did I get closer to puck?
-                    if distance_to_puck_before > distance_to_puck_after:
-                        # print("[HAVE NO PUCK] GOT CLOSER TO PUCK => reward = %.2f" % (reward_get_closer_to_puck))
-                        return reward_get_closer_to_puck
-                    # elif distance_to_puck_before < distance_to_puck_after:
-                    #     # print("[HAVE NO PUCK] GOT FARTHER FROM PUCK => reward = %.2f" % (-reward_get_closer_to_puck))
-                    #     return -reward_get_closer_to_puck
-            return 0 # TODO: seriously???? I thought it would be None !
+                    if have_puck_after:
+                        print("HAVE PUCK")
+                        # I still have the puck. Did I get closer to goal?
+                        if distance_to_goal_before > distance_to_goal_after:
+                            # print("HAVE PUCK, GOT CLOSER TO GOAL => reward = %.2f" % (reward_get_closer_to_goal))
+                            print("=====> and I'm closer to goal!")
+                            reward = self.bonus_for_having_puck + self.reward_get_closer_to_goal
+                        elif distance_to_goal_before < distance_to_goal_after:
+                            reward = self.bonus_for_having_puck - self.reward_get_closer_to_goal
+                        else:
+                            reward = self.bonus_for_having_puck
+                    else:
+                        # print("DON'T HAVE PUCK")
+                        # didn't have puck before, I don't have it now. Did I get closer to puck?
+                        if distance_to_puck_before > distance_to_puck_after:
+                            # print("[HAVE NO PUCK] GOT CLOSER TO PUCK")
+                            reward = self.reward_get_closer_to_puck
+                        elif distance_to_puck_before < distance_to_puck_after:
+                            # print("[HAVE NO PUCK] GOT FARTHER FROM PUCK => reward = %.2f" % (-reward_get_closer_to_puck))
+                            reward = -self.reward_get_closer_to_puck
+            # if reward > 0:
+            #     print("returning reward %.2f" % (reward))
+            return reward
 
 class Full5On5Rewards(LearnToPlayHockeyProblem):
     """Rewards for 5x5 hockey."""

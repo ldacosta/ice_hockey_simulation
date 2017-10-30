@@ -1,4 +1,5 @@
 import numpy as np
+from util.base import INCHES_IN_FOOT
 from geometry.vector import Vec2d
 from hockey.core.object_on_ice import ObjectOnIce
 
@@ -13,7 +14,7 @@ class Puck(ObjectOnIce):
     def __init__(self, hockey_world_model):
         # initially, the puck goes around randomly at low speed
         speeds = tuple(np.random.normal(loc=0.0, scale=5.0, size=2))
-        self.radius = (3 * 0.0834)/2 # 3 inches of diameter, this many feet
+        self.radius = (3 * 1/INCHES_IN_FOOT)/2 # 3 inches of diameter, this many feet
         super().__init__("puck",
                          hockey_world_model,
                          size=self.radius,
@@ -32,7 +33,7 @@ class Puck(ObjectOnIce):
     def move_around(self):
         self.move_by_bouncing_from_walls(
             prob_of_score_on_goal_opt=self.prob_of_goal,
-            friction_constant_opt=0.15 # reference: https://hypertextbook.com/facts/2004/GennaAbleman.shtml
+            friction_constant_opt=Puck.KINETIC_FRICTION_COEF
         )
 
     def set_free(self):
