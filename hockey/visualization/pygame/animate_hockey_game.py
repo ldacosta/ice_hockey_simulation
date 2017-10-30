@@ -22,8 +22,8 @@ from hockey.visualization.pygame.global_def import HALF_ICE_WIDTH, HALF_ICE_HEIG
 
 if __name__ == "__main__":
     # field
-    DATA_EVERY_SECS = .5 # TIME_PER_FRAME # .1 # 1 / 30
-    RECORD_THIS_MANY_MINUTES = 60 * 2 # * 6 # 60' == 1 game
+    DATA_EVERY_SECS = 2 # TIME_PER_FRAME # .1 # 1 / 30
+    RECORD_THIS_MANY_MINUTES = 30 # 60 * 3 # 60' == 1 game
     hockey_rink = HockeyHalfRink(how_many_offense=1, how_many_defense=0, one_step_in_seconds=TIME_PER_FRAME, collect_data_every_secs=DATA_EVERY_SECS, record_this_many_minutes=RECORD_THIS_MANY_MINUTES)
 
     run_simulation = False
@@ -54,7 +54,7 @@ if __name__ == "__main__":
 
     # FPS = 30
 
-    DISPLAY_EVERY_SECS = 2 * DATA_EVERY_SECS #5.0 # .5 #
+    DISPLAY_EVERY_SECS = 5 * DATA_EVERY_SECS #5.0 # .5 #
     assert DISPLAY_EVERY_SECS >= DATA_EVERY_SECS
     steps_between_displays = round(DISPLAY_EVERY_SECS / DATA_EVERY_SECS)
     print("I have data recorded every %.2f seconds, I want to display what happened every %.2f seconds, so I will display 1 out of %d frames" % (DATA_EVERY_SECS, DISPLAY_EVERY_SECS, steps_between_displays))
@@ -87,11 +87,13 @@ if __name__ == "__main__":
                 hockey_rink.defense[defenses_seen].pos = the_pos
                 hockey_rink.defense[defenses_seen].angle_looking_at = speed_angle
                 hockey_rink.defense[defenses_seen].current_speed = speed_amplitude
+                hockey_rink.defense[defenses_seen].speed = hockey_rink.defense[defenses_seen].speed_on_xy()
                 defenses_seen += 1
             elif agent_id.startswith("forward"):
                 hockey_rink.attack[attackers_seen].pos = the_pos
                 hockey_rink.attack[attackers_seen].angle_looking_at = speed_angle
                 hockey_rink.attack[attackers_seen].current_speed = speed_amplitude
+                hockey_rink.attack[attackers_seen].speed = hockey_rink.attack[attackers_seen].speed_on_xy()
                 attackers_seen += 1
             elif agent_id.startswith("puck"):
                 hockey_rink.puck.pos = the_pos
