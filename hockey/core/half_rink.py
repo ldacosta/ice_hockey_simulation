@@ -97,8 +97,24 @@ class HockeyHalfRink(Model):
         [self.space.place_agent(defense_player, pos = Point(self.GOALIE_X, self.get_random_position().y)) for defense_player in self.defense]
         [self.space.place_agent(attacker, pos = Point(self.BLUE_LINE_X, self.get_random_position().y)) for attacker in self.attack]
 
+    def set_random_positions_for_agents(self):
+        """Sets the players positions as at the beginning of an iteration."""
+
+        self.space.place_agent(self.puck, pos = self.get_random_position())
+        [self.space.place_agent(defense_player, pos = self.get_random_position()) for defense_player in self.defense]
+        [self.space.place_agent(attacker, pos = self.get_random_position()) for attacker in self.attack]
+
 
     def puck_request_by(self, agent):
+        """
+        TODO: has to return True / False!
+        
+        Args:
+            agent: 
+
+        Returns:
+
+        """
         current_owner = self.who_has_the_puck()
         if current_owner is None:
             self.give_puck_to(agent)
@@ -141,12 +157,13 @@ class HockeyHalfRink(Model):
         return Vec2d.from_to(from_pt=a_pos, to_pt=self.puck.pos).norm()
 
     def give_puck_to(self, agent):
-        current_owner = self.who_has_the_puck()
-        if current_owner is not None:
-            current_owner.release_puck()
-        agent.have_puck = True
-        self.puck.is_taken = True
-        self.space.place_agent(self.puck, pos=agent.pos)
+        if not agent.have_puck:
+            current_owner = self.who_has_the_puck()
+            if current_owner is not None:
+                current_owner.release_puck()
+            agent.have_puck = True
+            self.puck.is_taken = True
+            self.space.place_agent(self.puck, pos=agent.pos)
 
     def who_has_the_puck(self) -> Optional[Player]:
         """Returns None in no-one has the puck; otherwise returns the agent that has it."""
