@@ -62,11 +62,12 @@ class LearnToPlayHockeyProblem(Scenario, metaclass=abc.ABCMeta):
         self.player_sensing_idx = (self.player_sensing_idx + 1) % len(self.players_to_sample)
         if self.player_sensing_idx == 0:
             # sampled everyone. Move the puck, make world tick, restart.
-            self.hockey_world.datacollector.collect(self.hockey_world)
             # horrible, next 2 lines. Have to put it to reproduce what is done on half-rink. TODO: revisit it!
             self.hockey_world.schedule.steps += 1
             self.hockey_world.schedule.time += 1
             # end-of-TODO
+            self.hockey_world.collect_data_if_is_time()
+            # self.hockey_world.datacollector.collect(self.hockey_world)
             # beginning of a cycle of sensing.
             goals_before = self.hockey_world.goals_scored
             shots_before = self.hockey_world.shots
@@ -86,8 +87,6 @@ class LearnToPlayHockeyProblem(Scenario, metaclass=abc.ABCMeta):
         self.player_sensing.update_unable_time()
         bit_string = BitstringEnvironmentState(full_state=self.player_sensing.sense()).as_bitstring()
         self.xxx_can_reach_puck = bool(bit_string[2])
-        if self.xxx_can_reach_puck:
-            print("I CAN REACH PUCK!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         assert self.player_sensing.can_reach_puck() == self.xxx_can_reach_puck
         return bit_string
 
@@ -124,12 +123,8 @@ class BasicForwardProblem(LearnToPlayHockeyProblem):
             distance_to_puck_after = self.hockey_world.distance_to_puck(self.player_sensing.pos)
             have_puck_after = self.player_sensing.have_puck
             # sanity checking
-            if self.xxx_can_reach_puck:
-                print("I COULD reach puck and the action that I got suggested is %s (and the success bit is %s)" % (action, action_successful))
             if action == HockeyAction.GRAB_PUCK:
                 assert (action_successful == have_puck_after)
-                # if not action_successful and have_puck_after:
-                #     print("==============> Tried to grab puck and the result was %s (and have_puck_after == %s)" % (action_successful, have_puck_after))
 
             # if action was unsuccessful, let's clear the deck:
             if not action_successful:
@@ -145,11 +140,11 @@ class BasicForwardProblem(LearnToPlayHockeyProblem):
                     reward = self.reward_shot
                 else:
                     if have_puck_after:
-                        print("HAVE PUCK")
+                        # print("HAVE PUCK")
                         # I still have the puck. Did I get closer to goal?
                         if distance_to_goal_before > distance_to_goal_after:
                             # print("HAVE PUCK, GOT CLOSER TO GOAL => reward = %.2f" % (reward_get_closer_to_goal))
-                            print("=====> and I'm closer to goal!")
+                            # print("=====> and I'm closer to goal!")
                             reward = self.bonus_for_having_puck + self.reward_get_closer_to_goal
                         elif distance_to_goal_before < distance_to_goal_after:
                             reward = self.bonus_for_having_puck - self.reward_get_closer_to_goal
