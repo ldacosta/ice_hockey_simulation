@@ -24,8 +24,8 @@ class Player(ObjectOnIce, Sensor):
     MIN_SPEED_SPRINTING = 29
     MAX_SPEED_SPRINTING = 44
     # 'height' is in feet
-    MIN_HEIGHT = 4 * INCHES_IN_FOOT
-    MAX_HEIGHT = 7 * INCHES_IN_FOOT
+    MIN_HEIGHT = 4
+    MAX_HEIGHT = 7
     # power: serves for puck possession and for shooting
     MIN_POWER = 1
     MAX_POWER = 10
@@ -46,7 +46,7 @@ class Player(ObjectOnIce, Sensor):
 
     def __init__(self, prefix_on_id: str, hockey_world_model, brain: Brain):
         self.height = random_between(Player.MIN_HEIGHT, Player.MAX_HEIGHT)
-        self.reach = stick_length_for_height(self.height)
+        self.reach = stick_length_for_height(self.height * INCHES_IN_FOOT) / INCHES_IN_FOOT # in feet
         self.angle_looking_at = AngleInRadians.random()
         self.moving_speed = random_between(Player.MIN_SPEED_MOVING, Player.MAX_SPEED_MOVING)
         self.sprinting_speed = random_between(Player.MIN_SPEED_SPRINTING, Player.MAX_SPEED_SPRINTING)
@@ -84,64 +84,79 @@ class Player(ObjectOnIce, Sensor):
         self.angle_looking_at.randomly_mutate()
         self.speed = self.speed_on_xy()
 
-
     def __vector_me_to_puck__(self) -> Vec2d:
         return Vec2d.from_to(from_pt=self.pos, to_pt=self.model.puck.pos)
 
-    def __pt_in_front_of_me__(self) -> Tuple[float, float]:
-        p0 = (self.pos[0] + self.reach, self.pos[1])  # looking at angle = 0
-        p1 = rotatePoint(centerPoint=self.pos, point=p0, angle=self.angle_looking_at)
-        return p1
+    def __pt_in_front_of_me__(self) -> Point:
+        """Point that it's right in front of 'my eyes' at a distance of 'reach' """
+        as_vector = self.vector_looking_at().normalized() * self.reach
+        return Point(self.pos.x + as_vector.x, self.pos.y + as_vector.y)
 
     def can_reach_puck(self) -> bool:
         if self.unable_to_play_puck_time > 0:
             return False
+        elif not self.can_see_puck():
+            return False # if I can't see the puck, I can't reach it.
         else:
-            vector_me_to_puck = self.__vector_me_to_puck__()
-            if vector_me_to_puck.is_zero(): # I am standing ON TOP OF PUCK!!
-                return True
-            elif vector_me_to_puck.norm() > self.reach: # puck too far
-                return False
-            else: # is it in front of me?
-                # what IS the point "just in front" of me?
-                p_alpha = self.__pt_in_front_of_me__()
-                # find the 2 points that make the diameter of the semi-circle in front of me:
-                p_a = rotatePoint(centerPoint=self.pos, point=p_alpha, angle=AngleInRadians(value=math.pi / 2))
-                p_b = rotatePoint(centerPoint=self.pos, point=p_alpha, angle=AngleInRadians.from_minus_pi_to_plus_pi(value=-math.pi / 2))
-                # vector of the radius:
-                v_radius = Vec2d.from_to(from_pt=p_a, to_pt=p_b) # Vector2D(pt_from=p_a, pt_to=p_b)
-                # ok, finally:
-                the_angle = angle_between(v1 = v_radius, v2 = vector_me_to_puck)
-                return the_angle.value <= math.pi
+            d_to_puck = self.model.distance_to_puck(self.pos)
+            # print("[my reach = %.2f feet] d to puck = %.2f feet" % (player.reach, d_to_puck))
+            return (round(d_to_puck, 3) <= round(self.reach, 3)) and \
+                   (self.angle_to_puck().value <= AngleInRadians.PI_HALF)
 
     def angle_to_puck(self) -> AngleInRadians:
         v_me_to_puck = self.__vector_me_to_puck__()
         v_front_of_me = self.vector_looking_at()
         return angle_between(v1=v_me_to_puck, v2=v_front_of_me)
 
+    def on_top_of_puck(self) -> bool:
+        """True if the player is on top of puck."""
+        return self.pos == self.model.puck.pos
+
     def can_see_puck(self) -> bool:
-        v_me_to_puck = self.__vector_me_to_puck__()
-        v_front_of_me = self.vector_looking_at()
-        return angle_between(v1=v_me_to_puck, v2=v_front_of_me) < AngleInRadians.PI_HALF
-        # return (angle_between(v1=v_me_to_puck, v2=v_front_of_me) < AngleInRadians.PI_HALF) or \
-        #        (angle_between(v1=v_front_of_me, v2=v_me_to_puck) < AngleInRadians.PI_HALF)
+        if self.on_top_of_puck():
+            return True
+        else:
+            return self.angle_to_puck().value <= AngleInRadians.PI_HALF
+        # v_me_to_puck = self.__vector_me_to_puck__()
+        # if v_me_to_puck.is_zero(): # I am _on top_ of puck!
+        #     return True
+        # v_front_of_me = self.vector_looking_at()
+        # return angle_between(v1=v_me_to_puck, v2=v_front_of_me).value <= AngleInRadians.PI_HALF
 
     def __wander_around__(self):
         self.move_around()
         if random.random() <= 0.10:
             self.spin_around()
 
+    def grab_puck(self) -> bool:
+        if (not self.have_puck) and self.can_reach_puck():
+            self.model.puck_request_by(self)
+        return self.have_puck
+
     def __parse_action__(self, a: HockeyAction) -> bool:
+        """
+        
+        Args:
+            a: 
+
+        Returns:
+            True if the action was successfully taken. False otherwise.
+
+        """
+        action_taken = True
         if a == HockeyAction.MOVE_RANDOM_SPEED:
             self.current_speed = self.__choose_random_speed__()
+            self.speed = self.speed_on_xy()
             self.move_by_bouncing_from_walls()
             self.last_action = "Move at random (%.2f feet/sec.) speed" % self.current_speed
         elif a == HockeyAction.SPRINT:
             self.current_speed = self.sprinting_speed
+            self.speed = self.speed_on_xy()
             self.move_by_bouncing_from_walls()
             self.last_action = "Move at SPRINTING (%.2f feet/sec.) speed" % self.current_speed
         elif a == HockeyAction.SKATE_CALMLY:
             self.current_speed = self.moving_speed
+            self.speed = self.speed_on_xy()
             self.move_by_bouncing_from_walls()
             self.last_action = "Skate calmly: (%.2f feet/sec.) speed" % self.current_speed
         elif a == HockeyAction.SPIN_RANDOMLY:
@@ -163,22 +178,20 @@ class Player(ObjectOnIce, Sensor):
             self.chase_puck(only_when_my_team_doesnt_have_it=True) # TODO: verify flag
             self.last_action = "Chase puck"
         elif a == HockeyAction.GRAB_PUCK:
-            if self.have_puck:
-                self.last_action = "SUCCESSFUL Grab puck (already had it!)"
-            elif self.can_reach_puck():
-                self.model.puck_request_by(self)
+            action_taken = self.grab_puck()
+            if action_taken:
+                print(" *************************** SUCCESSFUL Grab puck")
                 self.last_action = "SUCCESSFUL Grab puck"
             else:
+                # print(" *************************** UN-SUCCESSFUL Grab puck")
                 self.last_action = "UNSUCCESSFUL Grab puck"
-
-            # if (self.have_puck):
-            #     print("[%s] I JUST TOOK the puck!" % (self.unique_id))
         else:
+            action_taken = False
             raise RuntimeError("Player does not know how to interpret action %s" % (a))
         # wrap-up:
         if self.have_puck:
             self.model.space.place_agent(self.model.puck, self.pos)
-        return True
+        return action_taken
 
     # def apply_actions(self, actions: List[HockeyAction], action_handler = __parse_action__) -> bool:
     #     actions = self.brain.propose_actions(the_state=self.sense())
@@ -252,6 +265,9 @@ class Player(ObjectOnIce, Sensor):
     def vector_looking_at(self) -> Vec2d:
         return Vec2d.from_angle(self.angle_looking_at)
 
-    def step(self):
+    def update_unable_time(self):
         self.unable_to_play_puck_time = max(0, self.unable_to_play_puck_time - TIME_PER_FRAME)
+
+    def step(self):
+        self.update_unable_time()
         self.act()
