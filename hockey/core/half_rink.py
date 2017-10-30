@@ -55,6 +55,7 @@ class HockeyHalfRink(Model):
         # data collector
         self.datacollector = DataCollector(
             model_reporters={
+                "steps": lambda m: m.schedule.steps,
                 "timestamp": lambda m: m.schedule.steps * m.one_step_in_seconds,
                 "puck_is_taken": lambda m: m.puck.is_taken,
                 "goals": lambda m: m.goals_scored,
