@@ -108,6 +108,15 @@ class Player(ObjectOnIce, Sensor):
         v_front_of_me = self.vector_looking_at()
         return angle_between(v1=v_me_to_puck, v2=v_front_of_me)
 
+    def angles_to_goal(self) -> Tuple[AngleInRadians, AngleInRadians]:
+        """Returns 2 vectors: 1 for each vertical post."""
+        one_post = Point(x=self.model.goal_position[0], y=self.model.goal_position[1][0])
+        other_post = Point(x=self.model.goal_position[0], y=self.model.goal_position[1][1])
+        v_to_one_post = Vec2d.from_to(from_pt=self.pos, to_pt=one_post)
+        v_to_other_post = Vec2d.from_to(from_pt=self.pos, to_pt=other_post)
+        v_front_of_me = self.vector_looking_at()
+        return (angle_between(v1=v_to_one_post, v2=v_front_of_me), angle_between(v1=v_to_one_post, v2=v_to_other_post))
+
     def on_top_of_puck(self) -> bool:
         """True if the player is on top of puck."""
         return self.pos == self.model.puck.pos
@@ -117,11 +126,11 @@ class Player(ObjectOnIce, Sensor):
             return True
         else:
             return self.angle_to_puck().value <= AngleInRadians.PI_HALF
-        # v_me_to_puck = self.__vector_me_to_puck__()
-        # if v_me_to_puck.is_zero(): # I am _on top_ of puck!
-        #     return True
-        # v_front_of_me = self.vector_looking_at()
-        # return angle_between(v1=v_me_to_puck, v2=v_front_of_me).value <= AngleInRadians.PI_HALF
+
+    def can_see_goal(self) -> bool:
+        angle_to_one_post, angle_to_other_post = self.angles_to_goal()
+        return (angle_to_one_post.value <= AngleInRadians.PI_HALF) or \
+               (angle_to_other_post.value <= AngleInRadians.PI_HALF)
 
     def __wander_around__(self):
         self.move_around()
