@@ -117,6 +117,9 @@ class Player(ObjectOnIce, Sensor):
         v_front_of_me = self.vector_looking_at()
         return (angle_between(v1=v_to_one_post, v2=v_front_of_me), angle_between(v1=v_to_one_post, v2=v_to_other_post))
 
+    def min_angle_to_goal(self) -> AngleInRadians:
+        return min(self.angles_to_goal())
+
     def on_top_of_puck(self) -> bool:
         """True if the player is on top of puck."""
         return self.pos == self.model.puck.pos
