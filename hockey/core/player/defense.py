@@ -16,19 +16,20 @@ class Defense(Player):
         super().__init__("defense", hockey_world_model, brain)
 
     def __parse_action_def__(self, a: HockeyAction) -> bool:
-        if a == HockeyAction.SHOOT:
-            pt_to_shoot_to = Point(x = 0.0, y = normalize_to(random(), new_min=0, new_max=self.model.height, old_min=0.0, old_max=1.0))
-            self.shoot_puck(direction=Vec2d.from_to(from_pt=self.pos, to_pt=pt_to_shoot_to))
-            self.move_around()
-        elif a == HockeyAction.PASS:
-            print("DEFENSE -> pass TODO =============================================================")
-            pass  # TODO
-        else:
-            return False
-        # wrap-up:
-        if self.have_puck:
-            self.model.space.place_agent(self.model.puck, self.pos)
-        return True
+        return False
+        # if a == HockeyAction.SHOOT:
+        #     pt_to_shoot_to = Point(x = 0.0, y = normalize_to(random(), new_min=0, new_max=self.model.height, old_min=0.0, old_max=1.0))
+        #     self.shoot_puck(direction=Vec2d.from_to(from_pt=self.pos, to_pt=pt_to_shoot_to))
+        #     self.move_around()
+        # elif a == HockeyAction.PASS:
+        #     print("DEFENSE -> pass TODO =============================================================")
+        #     pass  # TODO
+        # else:
+        #     return False
+        # # wrap-up:
+        # if self.have_puck:
+        #     self.model.space.place_agent(self.model.puck, self.pos)
+        # return True
 
     def apply_actions(self, actions: List[HockeyAction]) -> bool:
         if [self.__parse_action_def__(an_action) for an_action in actions][-1]:

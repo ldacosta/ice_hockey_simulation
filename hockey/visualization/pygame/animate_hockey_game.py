@@ -148,7 +148,7 @@ def main(argv):
                 the_pos = Point(x=row['pos_x'], y=row['pos_y'])
                 the_speed = Point(x=row['speed_x'], y=row['speed_y'])
                 v = Vec2d.origin_to(a_pt=the_speed)
-                speed_angle = v.angle_with_x_axis()
+                speed_angle = v.angle_with_positive_x_axis()
                 speed_amplitude = v.norm()
                 if agent_id.startswith("defense"):
                     hockey_rink.defense[defenses_seen].pos = the_pos

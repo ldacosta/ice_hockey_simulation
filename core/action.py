@@ -1,7 +1,7 @@
 
-from enum import Enum, auto
+from enum import Enum, auto, Flag
 
-class Action(Enum):
+class Action(Flag):
     """
     An action on an environment.
     Warnings:
