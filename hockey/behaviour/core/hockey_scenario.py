@@ -105,8 +105,6 @@ class LearnToPlayHockeyProblem(Scenario, metaclass=abc.ABCMeta):
         self.player_sensing = self.players_to_sample[self.player_sensing_idx]
         self.player_sensing.update_unable_time()
         bit_string = BitstringEnvironmentState(full_state=self.player_sensing.sense()).as_bitstring()
-        self.xxx_can_reach_puck = bool(bit_string[2])
-        assert self.player_sensing.can_reach_puck() == self.xxx_can_reach_puck
         return bit_string
 
 

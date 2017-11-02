@@ -35,13 +35,17 @@ def distance_to_bitstring(can_see: bool, distance: float, range_distances: List[
 
 class BitstringEnvironmentState(object):
 
-    num_slices_on_angles = 20
+    NUM_SLICES_ON_ANGLES = 20 # how many slices I want to see in [0, Pi]
+    DISTANCE_RANGE = list(range(10, 60 + 1, 10)) # distances I want to bitcheck for
 
     def __init__(self, full_state: EnvironmentState):
         self.full_state = full_state
 
     def as_bitstring(self) -> XCSBitString:
-        r_bitstring = XCSBitString([int(self.full_state.have_puck())])
+        """Builds a bitstring out of the information sensed by an agent."""
+
+        r_bitstring = XCSBitString([int(self.full_state.attacking)])
+        r_bitstring += XCSBitString([int(self.full_state.have_puck())])
         r_bitstring += XCSBitString([int(self.full_state.my_team_has_puck())])
         r_bitstring += XCSBitString([int(self.full_state.can_I_reach_puck())])
         # Puck related stuff
@@ -50,14 +54,13 @@ class BitstringEnvironmentState(object):
         r_bitstring += XCSBitString([can_see_puck_as_int])
         # distances:
         dist_to_puck = self.full_state.distance_to_puck()
-        distances = list(range(10, 60 + 1, 10))
         r_bitstring += distance_to_bitstring(can_see=self.full_state.me.can_see_puck(),
                                                      distance=dist_to_puck,
-                                                     range_distances=distances)
+                                                     range_distances=self.DISTANCE_RANGE)
         # angles
         r_bitstring += angle_to_bitstring(can_see=self.full_state.me.can_see_puck(),
-                                                   angle=self.full_state.me.angle_to_puck(),
-                                                   num_slices_on_angles=self.num_slices_on_angles)
+                                          angle=self.full_state.me.angle_to_puck(),
+                                          num_slices_on_angles=self.NUM_SLICES_ON_ANGLES)
         # Goal related stuff
         # can I see the goal?
         can_see_goal_as_int = int(self.full_state.me.can_see_goal())
@@ -66,10 +69,10 @@ class BitstringEnvironmentState(object):
         dist_to_goal = self.full_state.distance_to_goal()
         r_bitstring += distance_to_bitstring(can_see=self.full_state.me.can_see_goal(),
                                                      distance=dist_to_goal,
-                                                     range_distances=distances)
+                                                     range_distances=self.DISTANCE_RANGE)
         # angles:
         r_bitstring += angle_to_bitstring(can_see=self.full_state.me.can_see_puck(),
-                                                   angle=self.full_state.me.min_angle_to_goal(),
-                                                   num_slices_on_angles=self.num_slices_on_angles)
+                                          angle=self.full_state.me.min_angle_to_goal(),
+                                          num_slices_on_angles=self.NUM_SLICES_ON_ANGLES)
         # ok then! Return!
         return r_bitstring
