@@ -14,6 +14,7 @@ from hockey.behaviour.core.action import HockeyAction
 from hockey.core.model import TIME_PER_FRAME
 from hockey.core.object_on_ice import ObjectOnIce
 from util.base import random_between, stick_length_for_height, INCHES_IN_FOOT
+from util.geometry.lines import StraightLine
 
 class Player(ObjectOnIce, Sensor):
     """Hockey Player."""
@@ -29,7 +30,7 @@ class Player(ObjectOnIce, Sensor):
     # power: serves for puck possession and for shooting
     MIN_POWER = 1
     MAX_POWER = 10
-    # speed of puck. In feet/sec. (miles / hour to feet / sec is the transformation).
+    # speed of puck. In feet/sec. (miles/hour to feet/sec is the transformation).
     SHOT_MIN_SPEED = 80 * 1.4667
     SHOT_MAX_SPEED = 110 * 1.4667
     PASS_SPEED = SHOT_MIN_SPEED / 2
@@ -38,6 +39,67 @@ class Player(ObjectOnIce, Sensor):
     SHOT_b = SHOT_MIN_SPEED - MIN_POWER * SHOT_a
     # time that takes a player to make a pass (or shoot a puck). In seconds.
     TIME_TO_PASS_OR_SHOOT = 0.75
+
+    SHOOT_STRAIGHT_LINE = StraightLine.goes_by(point_1=(MIN_POWER, SHOT_MIN_SPEED), point_2=(MAX_POWER, SHOT_MAX_SPEED))
+    # PASS_STRAIGHT_LINE = StraightLine.goes_by(point_1=(MIN_POWER, PASS_MIN_SPEED), point_2=(MAX_POWER, PASS_MAX_SPEED))
+    SPRINT_STRAIGHT_LINE = StraightLine.goes_by(point_1=(MIN_POWER, MIN_SPEED_SPRINTING), point_2=(MAX_POWER, MAX_SPEED_SPRINTING))
+    SKATE_STRAIGHT_LINE = StraightLine.goes_by(point_1=(MIN_POWER, MIN_SPEED_MOVING), point_2=(MAX_POWER, MAX_SPEED_MOVING))
+
+    @classmethod
+    def direction_and_speed_from(cls,
+                                 a: HockeyAction,
+                                 power: float,
+                                 looking_at: Vec2d) -> Optional[Tuple[Vec2d, float]]:
+        if bool(a & HockeyAction.SHOOT):
+            s_line = cls.SHOOT_STRAIGHT_LINE
+        elif bool(a & HockeyAction.MOVE):
+            s_line = cls.SPRINT_STRAIGHT_LINE
+        else:
+            return None  # this doesn't look like a speed/direction flag.
+
+        # speed of the action
+        if bool(a & HockeyAction.HARD):
+            speed = s_line.apply_to(an_x=power)
+        elif bool(a & HockeyAction.SOFT):
+            speed = s_line.apply_to(an_x=power) / 2 # TODO: ok, this?
+        else:
+            return None  # this doesn't look like a speed/direction flag.
+        # which direction should I apply this angle?
+        if bool(a & HockeyAction.LEFT):
+            direction_multiplier = 1
+        elif bool(a & HockeyAction.RIGHT):
+            direction_multiplier = -1
+        else:
+            return None  # this doesn't look like a speed/direction flag.
+        # angle (in radians)
+        pi_half_over_10 = AngleInRadians.PI_HALF / 10
+        if bool(a & HockeyAction.RADIANS_0):
+            angle_value = 0
+        elif bool(a & HockeyAction.RADIANS_PI_TIMES_1_OVER_10):
+            angle_value = pi_half_over_10 * 1
+        elif bool(a & HockeyAction.RADIANS_PI_TIMES_2_OVER_10):
+            angle_value = pi_half_over_10 * 2
+        elif bool(a & HockeyAction.RADIANS_PI_TIMES_3_OVER_10):
+            angle_value = pi_half_over_10 * 3
+        elif bool(a & HockeyAction.RADIANS_PI_TIMES_4_OVER_10):
+            angle_value = pi_half_over_10 * 4
+        elif bool(a & HockeyAction.RADIANS_PI_TIMES_5_OVER_10):
+            angle_value = pi_half_over_10 * 5
+        elif bool(a & HockeyAction.RADIANS_PI_TIMES_6_OVER_10):
+            angle_value = pi_half_over_10 * 6
+        elif bool(a & HockeyAction.RADIANS_PI_TIMES_7_OVER_10):
+            angle_value = pi_half_over_10 * 7
+        elif bool(a & HockeyAction.RADIANS_PI_TIMES_8_OVER_10):
+            angle_value = pi_half_over_10 * 8
+        elif bool(a & HockeyAction.RADIANS_PI_TIMES_9_OVER_10):
+            angle_value = pi_half_over_10 * 9
+        elif bool(a & HockeyAction.RADIANS_PI_TIMES_10_OVER_10):
+            angle_value = pi_half_over_10 * 10
+        else:
+            return None  # this doesn't look like a speed/direction flag.
+        new_vector = looking_at.rotated_radians(
+            angle_radians=AngleInRadians(2 * AngleInRadians.PI + direction_multiplier * angle_value))
+        return (new_vector, speed)
 
     def __choose_random_speed__(self) -> float:
         """Returns a speed between 'moving' and 'sprinting' speeds."""
@@ -108,6 +170,18 @@ class Player(ObjectOnIce, Sensor):
         v_front_of_me = self.vector_looking_at()
         return angle_between(v1=v_me_to_puck, v2=v_front_of_me)
 
+    def angles_to_goal(self) -> Tuple[AngleInRadians, AngleInRadians]:
+        """Returns 2 vectors: 1 for each vertical post."""
+        one_post = Point(x=self.model.goal_position[0], y=self.model.goal_position[1][0])
+        other_post = Point(x=self.model.goal_position[0], y=self.model.goal_position[1][1])
+        v_to_one_post = Vec2d.from_to(from_pt=self.pos, to_pt=one_post)
+        v_to_other_post = Vec2d.from_to(from_pt=self.pos, to_pt=other_post)
+        v_front_of_me = self.vector_looking_at()
+        return (angle_between(v1=v_to_one_post, v2=v_front_of_me), angle_between(v1=v_to_one_post, v2=v_to_other_post))
+
+    def min_angle_to_goal(self) -> AngleInRadians:
+        return min(self.angles_to_goal())
+
     def on_top_of_puck(self) -> bool:
         """True if the player is on top of puck."""
         return self.pos == self.model.puck.pos
@@ -117,11 +191,14 @@ class Player(ObjectOnIce, Sensor):
             return True
         else:
             return self.angle_to_puck().value <= AngleInRadians.PI_HALF
-        # v_me_to_puck = self.__vector_me_to_puck__()
-        # if v_me_to_puck.is_zero(): # I am _on top_ of puck!
-        #     return True
-        # v_front_of_me = self.vector_looking_at()
-        # return angle_between(v1=v_me_to_puck, v2=v_front_of_me).value <= AngleInRadians.PI_HALF
+
+    def can_see_goal(self) -> bool:
+        """Can I see the front of the goal?"""
+        if self.pos.x > self.model.goal_position[0]: # I am behind the goal
+            return False
+        angle_to_one_post, angle_to_other_post = self.angles_to_goal()
+        return (angle_to_one_post.value <= AngleInRadians.PI_HALF) or \
+               (angle_to_other_post.value <= AngleInRadians.PI_HALF)
 
     def __wander_around__(self):
         self.move_around()
@@ -165,32 +242,49 @@ class Player(ObjectOnIce, Sensor):
         elif a == HockeyAction.NOOP:
             self.last_action = "NOOP"
             pass # doing nothing alright!
-        elif a == HockeyAction.SHOOT:
-            # _should_ be taken care of by specific kind of player -
-            # but if it gets here,, let's throw the puck to a random place.
-            self.shoot_puck(direction=Vec2d(tuple(np.random.normal(loc=0.0, scale=5.0, size=2))))
-            self.move_around()
-            self.last_action = "Generic SHOOT [are we sure this is OK????]"
-        elif a == HockeyAction.PASS:
-            self.last_action = "Generic PASS [are we sure this is OK????]"
-            pass  # TODO
-        elif a == HockeyAction.CHASE_PUCK:
-            self.chase_puck(only_when_my_team_doesnt_have_it=True) # TODO: verify flag
-            self.last_action = "Chase puck"
+        # elif a == HockeyAction.SHOOT:
+        #     # _should_ be taken care of by specific kind of player -
+        #     # but if it gets here,, let's throw the puck to a random place.
+        #     self.shoot_puck(direction=Vec2d(tuple(np.random.normal(loc=0.0, scale=5.0, size=2))))
+        #     self.move_around()
+        #     self.last_action = "Generic SHOOT [are we sure this is OK????]"
+        # elif a == HockeyAction.PASS:
+        #     self.last_action = "Generic PASS [are we sure this is OK????]"
+        #     pass  # TODO
+        # elif a == HockeyAction.CHASE_PUCK:
+        #     self.chase_puck(only_when_my_team_doesnt_have_it=True) # TODO: verify flag
+        #     self.last_action = "Chase puck"
         elif a == HockeyAction.GRAB_PUCK:
             action_taken = self.grab_puck()
-            if action_taken:
-                print(" *************************** SUCCESSFUL Grab puck")
-                self.last_action = "SUCCESSFUL Grab puck"
-            else:
-                # print(" *************************** UN-SUCCESSFUL Grab puck")
-                self.last_action = "UNSUCCESSFUL Grab puck"
+            self.last_action = "Grab puck"
+        elif bool(a & HockeyAction.MOVE):
+            r = Player.direction_and_speed_from(a, power=self.power, looking_at=self.vector_looking_at())
+            assert r is not None # see the condition above
+            direction, speed = r
+            self.angle_looking_at = direction.angle_with_positive_x_axis()
+            # print("direction is %s, angle_with_x is %s" % (direction, direction.angle_with_positive_x_axis()))
+            self.current_speed = speed
+            self.speed = self.speed_on_xy()
+            # mini sanity-check
+            la_norm =  self.vector_looking_at().normalized()
+            dir_norm = direction.normalized()
+            assert (abs(la_norm.x - dir_norm.x) <= 1e-3) and (abs(la_norm.y - dir_norm.y) <= 1e-3), \
+                "looking at: %s, direction: %s" % (self.vector_looking_at().normalized(), direction.normalized())
+            self.move_around()
+        elif bool(a & HockeyAction.SHOOT):
+            r = Player.direction_and_speed_from(a, power=self.power, looking_at=self.vector_looking_at())
+            assert r is not None # see the condition above
+            direction, speed = r
+            self.last_action = "send puck, speed = %.2f feet/sec, direction = %s" % (speed, direction)
+            action_taken = self.__send_puck__(puck_speed_vector=direction, speed_multiplier=speed)
         else:
             action_taken = False
             raise RuntimeError("Player does not know how to interpret action %s" % (a))
         # wrap-up:
         if self.have_puck:
             self.model.space.place_agent(self.model.puck, self.pos)
+        if not action_taken:
+            self.last_action = "[FAILED] " + self.last_action
         return action_taken
 
     # def apply_actions(self, actions: List[HockeyAction], action_handler = __parse_action__) -> bool:

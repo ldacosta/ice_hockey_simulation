@@ -33,6 +33,25 @@ class LearnToPlayHockeyProblem(Scenario, metaclass=abc.ABCMeta):
 
     def __init__(self, hockey_world: HockeyHalfRink):
         self.possible_actions = list(HockeyAction)
+        # I will remove atomic actions for which I don't want to respond (or don't know how to):
+        self.possible_actions.remove(HockeyAction.SHOOT)
+        self.possible_actions.remove(HockeyAction.MOVE)
+        self.possible_actions.remove(HockeyAction.HARD)
+        self.possible_actions.remove(HockeyAction.SOFT)
+        self.possible_actions.remove(HockeyAction.LEFT)
+        self.possible_actions.remove(HockeyAction.RIGHT)
+        self.possible_actions.remove(HockeyAction.RADIANS_0)
+        self.possible_actions.remove(HockeyAction.RADIANS_PI_TIMES_1_OVER_10)
+        self.possible_actions.remove(HockeyAction.RADIANS_PI_TIMES_2_OVER_10)
+        self.possible_actions.remove(HockeyAction.RADIANS_PI_TIMES_3_OVER_10)
+        self.possible_actions.remove(HockeyAction.RADIANS_PI_TIMES_4_OVER_10)
+        self.possible_actions.remove(HockeyAction.RADIANS_PI_TIMES_5_OVER_10)
+        self.possible_actions.remove(HockeyAction.RADIANS_PI_TIMES_6_OVER_10)
+        self.possible_actions.remove(HockeyAction.RADIANS_PI_TIMES_7_OVER_10)
+        self.possible_actions.remove(HockeyAction.RADIANS_PI_TIMES_8_OVER_10)
+        self.possible_actions.remove(HockeyAction.RADIANS_PI_TIMES_9_OVER_10)
+        self.possible_actions.remove(HockeyAction.RADIANS_PI_TIMES_10_OVER_10)
+
         self.hockey_world = hockey_world
         self.players_to_sample = self.hockey_world.defense + self.hockey_world.attack
         random.shuffle(self.players_to_sample)
@@ -142,14 +161,13 @@ class BasicForwardProblem(LearnToPlayHockeyProblem):
                     if have_puck_after:
                         # print("HAVE PUCK")
                         # I still have the puck. Did I get closer to goal?
+                        reward = self.bonus_for_having_puck
                         if distance_to_goal_before > distance_to_goal_after:
                             # print("HAVE PUCK, GOT CLOSER TO GOAL => reward = %.2f" % (reward_get_closer_to_goal))
                             # print("=====> and I'm closer to goal!")
-                            reward = self.bonus_for_having_puck + self.reward_get_closer_to_goal
+                            reward += self.reward_get_closer_to_goal
                         elif distance_to_goal_before < distance_to_goal_after:
-                            reward = self.bonus_for_having_puck - self.reward_get_closer_to_goal
-                        else:
-                            reward = self.bonus_for_having_puck
+                            reward -= self.reward_get_closer_to_goal
                     else:
                         # print("DON'T HAVE PUCK")
                         # didn't have puck before, I don't have it now. Did I get closer to puck?

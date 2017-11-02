@@ -6,6 +6,8 @@ from geometry.vector import Vec2d, X_UNIT_VECTOR, Y_UNIT_VECTOR
 from geometry.point import Point
 from geometry.angle import AngleInRadians
 from hockey.core.half_rink import HockeyHalfRink
+from hockey.behaviour.core.action import HockeyAction
+from hockey.core.player.base import Player
 
 class TestBasePlayer(unittest.TestCase):
     """Testing definitions of a player."""
@@ -128,3 +130,25 @@ class TestBasePlayer(unittest.TestCase):
             for player in self.half_ice_rink.defense + self.half_ice_rink.attack:
                 if player.can_reach_puck():
                     self.assertTrue(player.grab_puck())
+
+    def test_calculate_speed_and_direction(self):
+        """Basic functionality for shooting and moving."""
+        r = Player.direction_and_speed_from(a = HockeyAction.SHOOT_HARD_TO_LEFT_PI_TIMES_1_OVER_10,
+                                            power=Player.MAX_POWER,
+                                            looking_at=Y_UNIT_VECTOR)
+        self.assertNotEqual(r, None)
+        direction, speed = r
+        self.assertEqual(speed, Player.SHOT_MAX_SPEED)
+        self.assertNotEqual(direction, Y_UNIT_VECTOR)
+        self.assertTrue(direction.x < Y_UNIT_VECTOR.x, "direction = %s" % (direction))
+        self.assertTrue(direction.y < Y_UNIT_VECTOR.y, "direction = %s" % (direction))
+
+        r = Player.direction_and_speed_from(a = HockeyAction.SHOOT_HARD_TO_RIGHT_PI_TIMES_1_OVER_10,
+                                            power=Player.MAX_POWER,
+                                            looking_at=Y_UNIT_VECTOR)
+        self.assertNotEqual(r, None)
+        direction, speed = r
+        self.assertEqual(speed, Player.SHOT_MAX_SPEED)
+        self.assertNotEqual(direction, Y_UNIT_VECTOR)
+        self.assertTrue(direction.x > Y_UNIT_VECTOR.x, "direction = %s" % (direction))
+        self.assertTrue(direction.y < Y_UNIT_VECTOR.y, "direction = %s" % (direction))

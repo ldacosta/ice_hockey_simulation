@@ -65,18 +65,32 @@ class ScenarioSimulator(Simulator):
         # algorithm.mutation_probability = .002
 
 
-        # Create a classifier set from the algorithm, tailored for the
-        # scenario you have selected.
-        model = algorithm.new_model(self.scenario)
+        # scenario = MUXProblem()
+        # algorithm = XCSAlgorithm()
+        # algorithm.exploration_probability = .1
+        model = algorithm.run(self.scenario)
+        #
+        #
+        # # Create a classifier set from the algorithm, tailored for the
+        # # scenario you have selected.
+        # model = algorithm.new_model(self.scenario)
+        #
+        # # Run the classifier set in the scenario, optimizing it as the
+        # # scenario unfolds.
+        # model.run(self.scenario, learn=True)
 
-        # Run the classifier set in the scenario, optimizing it as the
-        # scenario unfolds.
-        model.run(self.scenario, learn=True)
-
-        # Or get a quick list of the best classifiers discovered.
+        # Get a quick list of the best classifiers discovered.
+        good_rules = 0
         for rule in model:
             if rule.fitness > .5 and rule.experience > 10:
-                print(rule.condition, '=>', rule.action, ' [%.5f]' % rule.fitness)
+                good_rules += 1
+                print(rule.condition, '=>', rule.action, ' [%.5f, experience: %d]' % (rule.fitness, rule.experience))
+            if good_rules < 2:
+                if rule.fitness > .5:
+                    good_rules += 1
+                    print(rule.condition, '=>', rule.action, ' [%.5f]' % rule.fitness)
+        if good_rules < 5:
+            print("Only %d 'good' rules found" % good_rules)
 
         # steps, reward, seconds, model = xcs.test(algorithm, scenario=self.scenario) # algorithm=XCSAlgorithm,
         self.running = False
