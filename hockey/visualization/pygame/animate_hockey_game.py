@@ -123,6 +123,7 @@ def main(argv):
 
         pygame.init()
         clock = pygame.time.Clock()
+        old_minutes_in_simulation = -1
         for i in range(0, num_steps + 1):
             df_step = agents_df.loc[agents_df['Step'] == i]
             defenses_seen = 0
@@ -150,6 +151,11 @@ def main(argv):
                     hockey_rink.puck.pos = the_pos
                 else:
                     assert False
+            seconds_in_simulation = DATA_EVERY_SECS * i
+            minutes_in_simulation = seconds_in_simulation // 60
+            if minutes_in_simulation > old_minutes_in_simulation:
+                print("Minute %d of simulation" % (minutes_in_simulation))
+                old_minutes_in_simulation = minutes_in_simulation
             tick_time = clock.tick(FPS)
             times_between_frames.append(tick_time)
             surface.fill(THECOLORS['black']) # this is basically a CLEAR. TODO: can we do something better????

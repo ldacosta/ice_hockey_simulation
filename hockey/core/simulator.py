@@ -5,6 +5,7 @@ import pickle
 from mesa import Model
 from pathlib import Path
 import os
+import time
 
 from typing import Optional
 import xcs
@@ -61,6 +62,16 @@ class ScenarioSimulator(Simulator):
             self.save_to = os.path.join(ScenarioSimulator.MODELS_DIR, save_to_file_name)
 
     def run(self):
+        def show_good_rules(model):
+            good_rules = 0
+            for rule in model:
+                if rule.fitness > .5:
+                    good_rules += 1
+                    print(rule.condition, '=>', rule.action, ' [%.5f, experience: %d]' % (rule.fitness, rule.experience))
+
+            if good_rules < 5:
+                print("Only %d 'good' rules found" % good_rules)
+
         self.running = True
 
         logging.root.setLevel(logging.INFO)
@@ -90,8 +101,10 @@ class ScenarioSimulator(Simulator):
         # model = algorithm.run(self.scenario)
 
         if (self.load_from is not None) and Path(self.load_from).is_file():
-            print("Loading model from file '%s'..." % (self.load_from))
+            last_modified_str = time.ctime(os.stat(self.load_from).st_mtime)
+            print("Loading model from file '%s' (last modified on %s)..." % (self.load_from, last_modified_str))
             model = pickle.load(open(self.load_from, 'rb'))
+            show_good_rules(model)
         else:
             if self.load_from is not None:
                 print("File '%s' does not exist." % (self.load_from))
@@ -106,17 +119,7 @@ class ScenarioSimulator(Simulator):
         model.run(self.scenario, learn=True)
 
         # Get a quick list of the best classifiers discovered.
-        good_rules = 0
-        for rule in model:
-            if rule.fitness > .5 and rule.experience > 10:
-                good_rules += 1
-                print(rule.condition, '=>', rule.action, ' [%.5f, experience: %d]' % (rule.fitness, rule.experience))
-            if good_rules < 2:
-                if rule.fitness > .5:
-                    good_rules += 1
-                    print(rule.condition, '=>', rule.action, ' [%.5f]' % rule.fitness)
-        if good_rules < 5:
-            print("Only %d 'good' rules found" % good_rules)
+        show_good_rules(model)
 
         if (self.save_to is not None):
             print("Saving model into file '%s'..." % (self.save_to))
