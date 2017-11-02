@@ -6,6 +6,7 @@ from geometry.vector import Vec2d, angle_between
 from geometry.angle import AngleInRadians, rotatePoint
 from core.environment_state import EnvironmentState as CoreEnvironmentState
 from hockey.core.player.base import Player
+from hockey.core.player.forward import Forward
 
 class EnvironmentState(CoreEnvironmentState):
 
@@ -14,6 +15,7 @@ class EnvironmentState(CoreEnvironmentState):
         self.me = me
         self.puck_owner_opt = puck_owner_opt
         self.puck_pos_opt = puck_pos_opt
+        self.attacking = (type(me) == Forward)
 
     def have_puck(self) -> bool:
         if self.puck_owner_opt is None:
