@@ -151,12 +151,14 @@ class BasicForwardProblem(LearnToPlayHockeyProblem):
             if action == HockeyAction.GRAB_PUCK:
                 assert (action_successful == have_puck_after)
 
+            seconds_in_simulation = self.hockey_world.schedule.steps * self.hockey_world.one_step_in_seconds
+            timestamp_simulation_str = "Minute %d:%d" % (seconds_in_simulation // 60, int(round(seconds_in_simulation % 60)))
             reward = 0  # TODO: seriously???? I thought it would be None !
             if self.apply_rewards_for_goal:
-                print("APPLY REWARD FOR GOAL")
+                print("[%s] APPLY REWARD FOR GOAL" % (timestamp_simulation_str))
                 reward = LearnToPlayHockeyProblem.REWARD_FOR_GOAL
             elif self.apply_rewards_for_shot:
-                print("APPLY REWARD FOR SHOT")
+                print("[%s] APPLY REWARD FOR SHOT" % (timestamp_simulation_str))
                 reward = self.reward_shot
             elif self.apply_reward_for_trying_to_shoot:
                 sl = StraightLine.goes_by(
@@ -166,8 +168,8 @@ class BasicForwardProblem(LearnToPlayHockeyProblem):
                 dist = self.hockey_world.distance_to_closest_goal_post(self.hockey_world.puck.pos)
                 reward = sl.apply_to(an_x=dist)
                 print(
-                    "Apply reward for trying to shoot: distance is %.2f feet, reward is %.2f (for an actual shot is %.2f)" % (
-                    dist, reward, self.reward_shot))
+                    "[%s] Apply reward for trying to shoot: distance is %.2f feet, reward is %.2f (for an actual shot is %.2f)" % (
+                        timestamp_simulation_str, dist, reward, self.reward_shot))
             elif not action_successful: # if action was unsuccessful, let's clear the deck:
                 reward = self.punishment_action_failed
             if action_successful:
