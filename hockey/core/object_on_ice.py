@@ -32,6 +32,10 @@ class ObjectOnIce(Agent):
     def is_moving(self) -> bool:
         return not self.speed.is_zero()
 
+    def is_behind_goal_line(self) -> bool:
+        """Is this agent behind the goal line?"""
+        return self.pos.x > self.model.GOALIE_X
+
     def move_by_bouncing_from_walls(self, prob_of_score_on_goal_opt: Optional[float] = None, friction_constant_opt: Optional[float] = None):
         """
         Moves around the ice, bouncing from walls and from the goal.
@@ -127,4 +131,4 @@ class ObjectOnIce(Agent):
 
     @abc.abstractmethod
     def move_around(self):
-        pass
+        raise NotImplementedError
