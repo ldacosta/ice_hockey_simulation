@@ -10,7 +10,7 @@ from geometry.vector import Vec2d
 from util.base import choose_first_option_by_roulette
 from util.geometry.lines import cells_between
 from hockey.core.puck import Puck
-from typing import Optional
+from typing import Optional, Tuple
 
 from hockey.behaviour.core.rule_based_brain import RuleBasedBrain
 from hockey.core.player.base import Player
@@ -153,6 +153,16 @@ class HockeyHalfRink(Model):
 
     def distance_to_goal(self, a_pos: Point) -> float:
         return Vec2d.from_to(from_pt=a_pos, to_pt=self.GOALIE_CENTER).norm()
+
+    def distance_to_goal_posts(self, a_pos: Point) -> Tuple[float, float]:
+        """Distance, in feet, to both goal posts"""
+        d1 = a_pos.distance_to(another_point=Point(self.GOALIE_X, self.GOALIE_Y_BOTTOM))
+        d2 = a_pos.distance_to(another_point=Point(self.GOALIE_X, self.GOALIE_Y_TOP))
+        return (d1, d2)
+
+    def distance_to_closest_goal_post(self, a_pos: Point) -> float:
+        """Distance, in feet, to closest goal post"""
+        return min(self.distance_to_goal_posts(a_pos))
 
     def distance_to_puck(self, a_pos: Point) -> float:
         return Vec2d.from_to(from_pt=a_pos, to_pt=self.puck.pos).norm()
