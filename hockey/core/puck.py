@@ -6,7 +6,8 @@ from hockey.core.object_on_ice import ObjectOnIce
 class Puck(ObjectOnIce):
     """How does a Puck behave?"""
 
-    KINETIC_FRICTION_COEF = 0.15 # from https://hypertextbook.com/facts/2004/GennaAbleman.shtml
+    # KINETIC_FRICTION_COEF = 0.15 # from https://hypertextbook.com/facts/2004/GennaAbleman.shtml
+    KINETIC_FRICTION_COEF = 0.07 # http://people.westminstercollege.edu/faculty/ccline/courses/resources/wp/proj/211-w-frictiondrag.pdf
 
     # Elasticity represents the loss of speed a particle experiences when it hits a boundary.
     ELASTICITY = 0.77 # inspired by http://www.petercollingridge.co.uk/book/export/html/6
