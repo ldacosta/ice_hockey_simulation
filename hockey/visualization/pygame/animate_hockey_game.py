@@ -94,7 +94,9 @@ def main(argv):
     if mode_simulation:
         mesa_simulator = MesaModelSimulator(mesa_model=hockey_rink)
         hockey_problem = BasicForwardProblem(hockey_world=hockey_rink)
-        xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name="my_model_1.bin", save_to_file_name="my_model_1.bin")
+        xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name="my_model_1.bin", save_to_file_name=None)
+        # xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name=None, save_to_file_name="my_model_1.bin")
+        # xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name="my_model_1_2.bin", save_to_file_name="my_model_1_2.bin")
         # mesa_simulator.run()
         xcs_simulator.run()
 
