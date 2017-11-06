@@ -1,8 +1,10 @@
 import unittest
 from random import sample as randomsample
 
+from hockey.core.half_rink import HockeyHalfRink
 from geometry.angle import AngleInRadians
-from hockey.behaviour.core.bitstring_environment_state import angle_to_bitstring, distance_to_bitstring
+from hockey.behaviour.core.environment_state import EnvironmentState
+from hockey.behaviour.core.bitstring_environment_state import BitstringEnvironmentState, angle_to_bitstring, distance_to_bitstring
 
 class TestBitstringEncoding(unittest.TestCase):
     """Testing definitions of a player."""
@@ -10,6 +12,14 @@ class TestBitstringEncoding(unittest.TestCase):
     def setUp(self):
         """Initialization"""
         self.NUM_SLICES = 20
+        self.half_ice_rink = HockeyHalfRink(how_many_defense=5, how_many_offense=5, one_step_in_seconds=1/20, collect_data_every_secs=1, record_this_many_minutes=1)
+
+    def test_proper_encoding(self):
+        """Are things that I want to encode properly defined?"""
+        env_state = EnvironmentState(me=self.half_ice_rink.defense[0], puck_pos_opt=None, puck_owner_opt=None)
+        bitstring_state = BitstringEnvironmentState(full_state=env_state)
+        bitstring_state.build_defs() # if this doesn't blow up, we're good:
+        self.assertTrue(True)
 
     def test_angle_encoding(self):
         """How is an angle encoded."""
