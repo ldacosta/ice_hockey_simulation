@@ -2,7 +2,7 @@
 import abc
 import random
 from typing import Optional
-from geometry.point import Point
+import time
 
 from xcs.scenarios import Scenario
 from xcs.bitstrings import BitString
@@ -14,20 +14,20 @@ from hockey.behaviour.core.bitstring_environment_state import BitstringEnvironme
 
 from hockey.core.player.base import Player
 
-class PlayerMetrics(object):
-
-    def __init__(self, a_player: Player):
-        self.player = a_player
-        self.update()
-
-    def update(self):
-        self.goals = self.player.model.goals_scored
-        self.shots = self.player.model.shots
-        self.distance_to_goal = self.player.model.distance_to_goal(self.player.pos)
-        self.distance_to_puck = self.player.model.distance_to_puck_opt(self.player.pos)
-        self.have_puck = self.player.have_puck
-
-
+# class PlayerMetrics(object):
+#
+#     def __init__(self, a_player: Player):
+#         self.player = a_player
+#         self.update()
+#
+#     def update(self):
+#         self.goals = self.player.model.goals_scored
+#         self.shots = self.player.model.shots
+#         self.distance_to_goal = self.player.model.distance_to_goal(self.player.pos)
+#         self.distance_to_puck = self.player.model.distance_to_puck(self.player.pos)
+#         self.have_puck = self.player.have_puck
+#
+#
 class LearnToPlayHockeyProblem(Scenario, metaclass=abc.ABCMeta):
     """Learning to play soccer with XCS"""
 
@@ -57,7 +57,7 @@ class LearnToPlayHockeyProblem(Scenario, metaclass=abc.ABCMeta):
         self.hockey_world = hockey_world
         self.players_to_sample = self.hockey_world.defense + self.hockey_world.attack
         random.shuffle(self.players_to_sample)
-        self.players_metrics = list(map(PlayerMetrics, self.players_to_sample))
+        # self.players_metrics = list(map(PlayerMetrics, self.players_to_sample))
         self.player_sensing_idx = 0
         self.reset()
 
@@ -155,10 +155,10 @@ class BasicForwardProblem(LearnToPlayHockeyProblem):
             timestamp_simulation_str = "Minute %d:%d" % (seconds_in_simulation // 60, int(round(seconds_in_simulation % 60)))
             reward = 0  # TODO: seriously???? I thought it would be None !
             if self.apply_rewards_for_goal:
-                print("[%s] APPLY REWARD FOR GOAL" % (timestamp_simulation_str))
+                print("[%s, %s] APPLY REWARD FOR GOAL" % (time.ctime(), timestamp_simulation_str))
                 reward = LearnToPlayHockeyProblem.REWARD_FOR_GOAL
             elif self.apply_rewards_for_shot:
-                print("[%s] APPLY REWARD FOR SHOT" % (timestamp_simulation_str))
+                print("[%s, %s] APPLY REWARD FOR SHOT" % (time.ctime(), timestamp_simulation_str))
                 reward = self.reward_shot
             elif self.apply_reward_for_trying_to_shoot:
                 sl = StraightLine.goes_by(
@@ -168,8 +168,8 @@ class BasicForwardProblem(LearnToPlayHockeyProblem):
                 dist = self.hockey_world.distance_to_closest_goal_post(self.hockey_world.puck.pos)
                 reward = sl.apply_to(an_x=dist)
                 print(
-                    "[%s] Apply reward for trying to shoot: distance is %.2f feet, reward is %.2f (for an actual shot is %.2f)" % (
-                        timestamp_simulation_str, dist, reward, self.reward_shot))
+                    "[%s, %s] Apply reward for trying to shoot: distance is %.2f feet, reward is %.2f (for an actual shot is %.2f)" % (
+                        time.ctime(), timestamp_simulation_str, dist, reward, self.reward_shot))
             else:
                 if not action_successful: # if action was unsuccessful, let's clear the deck:
                     reward += self.punishment_action_failed
