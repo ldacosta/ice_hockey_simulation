@@ -333,6 +333,7 @@ class Player(ObjectOnIce, Sensor):
             dir_norm = direction.normalized()
             assert (abs(la_norm.x - dir_norm.x) <= 1e-3) and (abs(la_norm.y - dir_norm.y) <= 1e-3), \
                 "looking at: %s, direction: %s" % (self.vector_looking_at().normalized(), direction.normalized())
+            self.last_action = "Move => speed = %.2f feet/sec, direction = %s, so I am going %s" % (self.current_speed, self.angle_looking_at, self.speed)
             self.move_around()
         elif bool(a & HockeyAction.SHOOT):
             r = Player.direction_and_speed_from(a, power=self.power, looking_at=self.vector_looking_at())

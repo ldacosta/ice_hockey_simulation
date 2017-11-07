@@ -21,6 +21,14 @@ from hockey.visualization.pygame.global_def import HALF_ICE_WIDTH, HALF_ICE_HEIG
 
 import sys, getopt
 
+def read_and_merge_dataframes(input_directory, prefix_fname: str, verbose: bool = False) -> pd.DataFrame:
+    all_fnames = [os.path.join(input_directory, fname)
+                        for fname in os.listdir(input_directory) if fname.startswith(prefix_fname) and fname.endswith(".pd")]
+    if verbose:
+        print("From '%s' I read %s" % (input_directory, all_fnames))
+    return pd.concat(list(map(pd.read_csv, all_fnames)), ignore_index=True)
+
+
 def main(argv):
     def show_options():
         print("To run experience, do:")
@@ -78,41 +86,86 @@ def main(argv):
         if speedup <= 0:
             raise RuntimeError("[mode = visualization] input directory must be specified")
 
-    if mode_simulation:
-        os.makedirs(output_directory, exist_ok=True)
-        full_model_file_name = os.path.join(output_directory, "model.pd")
-        agents_file_name = os.path.join(output_directory, "agents.pd")
-        print("Will record %d minutes of simulated action, snapshots every %.2f seconds; will then save output in %s"
-              % (RECORD_THIS_MANY_MINUTES, DATA_EVERY_SECS, output_directory))
-    else:
-        if not os.path.exists(input_directory):
-            raise RuntimeError("Directory [%s] does not exist" % (input_directory))
-        full_model_file_name = os.path.join(input_directory, "model.pd")
-        agents_file_name = os.path.join(input_directory, "agents.pd")
-        print("Will visualize snapshots from [%s] at a speedup of %.2f"
-              % (input_directory, speedup))
-
     # field
     hockey_rink = HockeyHalfRink(how_many_offense=1, how_many_defense=0, one_step_in_seconds=TIME_PER_FRAME, collect_data_every_secs=DATA_EVERY_SECS, record_this_many_minutes=RECORD_THIS_MANY_MINUTES)
-
     if mode_simulation:
+        os.makedirs(output_directory, exist_ok=True)
+        # let's choose the name of the files were the data will be saved:
+        # model
+        print("************************** Choosing file name where to save model...")
+        num_model_file = 1
+        model_file_name = "model_%d.pd" % num_model_file
+        full_model_file_name = os.path.join(output_directory, model_file_name)
+        print("Trying '%s'..." % (full_model_file_name))
+        # max_tick = 0
+        max_step = 0
+        max_goals = 0
+        max_shots = 0
+        max_timestamp = 0
+        while os.path.exists(full_model_file_name):
+            # update max's
+            model_df = pd.read_csv(full_model_file_name)
+            print(list(model_df.columns.values))
+            # max_tick = max(max_tick, model_df["Unnamed: 0"].max())
+            max_step = max(max_step, model_df["steps"].max())
+            max_goals = max(max_goals, model_df["goals"].max())
+            max_shots = max(max_shots, model_df["shots"].max())
+            max_timestamp = max(max_timestamp, model_df["timestamp"].max())
+            print("Updating max_steps to %d, max_goals to %d, max_shots to %d, max_timestamp to %.2f" % (max_step, max_goals, max_shots, max_timestamp))
+            # new file to search
+            num_model_file += 1
+            model_file_name = "model_%d.pd" % num_model_file
+            full_model_file_name = os.path.join(output_directory, model_file_name)
+            print("Trying '%s'..." % (full_model_file_name))
+        print("[Model file] Chosen '%s'" % (full_model_file_name))
+        # agents
+        print("************************** Choosing file name where to save agents...")
+        num_agents_file = 1
+        agents_file_name = "agents_%d.pd" % num_agents_file
+        full_agents_file_name = os.path.join(output_directory, agents_file_name)
+        print("Trying '%s'..." % (full_agents_file_name))
+        while os.path.exists(full_agents_file_name):
+            num_agents_file += 1
+            agents_file_name = "agents_%d.pd" % num_model_file
+            full_agents_file_name = os.path.join(output_directory, agents_file_name)
+            print("Trying '%s'..." % (full_agents_file_name))
+        print("[Agents file] Chosen '%s'\n" % (full_agents_file_name))
+        print("Will record %d minutes of simulated action, snapshots every %.2f seconds; will then save output in %s"
+              % (RECORD_THIS_MANY_MINUTES, DATA_EVERY_SECS, output_directory))
         mesa_simulator = MesaModelSimulator(mesa_model=hockey_rink)
         hockey_problem = BasicForwardProblem(hockey_world=hockey_rink)
         # xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name="my_model_1.bin", save_to_file_name=None)
-        xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name="my_model_1.bin", save_to_file_name="my_model_1.bin")
+        xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name="my_model_1.bin",
+                                          save_to_file_name="my_model_1.bin")
         # xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name="my_model_1_2.bin", save_to_file_name="my_model_1_2.bin")
         # mesa_simulator.run()
         xcs_simulator.run()
 
-        hockey_rink.datacollector.get_model_vars_dataframe().to_csv(full_model_file_name)
-        hockey_rink.datacollector.get_agent_vars_dataframe().to_csv(agents_file_name)
+        model_df = hockey_rink.datacollector.get_model_vars_dataframe()
+        model_df["goals"] += max_goals
+        model_df["shots"] += max_shots
+        model_df["steps"] += max_step
+        model_df["timestamp"] += max_timestamp
+
+        agents_df = hockey_rink.datacollector.get_agent_vars_dataframe()
+        print(list(agents_df.columns.values))
+        agents_df["timestamp"] += max_timestamp
+
+        model_df.to_csv(full_model_file_name)
+        agents_df.to_csv(full_agents_file_name)
     else:
-        model_df = pd.read_csv(full_model_file_name)
-        num_steps = model_df["Unnamed: 0"].max()
+        if not os.path.exists(input_directory):
+            raise RuntimeError("Directory [%s] does not exist" % (input_directory))
+        # all model files, concatenated
+        model_df = read_and_merge_dataframes(input_directory, prefix_fname="model", verbose=True)
+        num_steps = model_df["steps"].max()
         num_goals = model_df["goals"].max()
         print("[Recording length: %d minutes] %d steps of simulation, %d goals" % (RECORD_THIS_MANY_MINUTES, num_steps, num_goals))
         DATA_EVERY_SECS = round(model_df.iloc[2]["timestamp"] - model_df.iloc[1]["timestamp"], 5)
-        agents_df = pd.read_csv(agents_file_name) # ("/tmp/agents.pd")
+        # all agent files, concatenated
+        agents_df = read_and_merge_dataframes(input_directory, prefix_fname="agents", verbose=True)
+        print("Will visualize snapshots from [%s] at a speedup of %.2f"
+              % (input_directory, speedup))
 
         # all renderings
         hockey_rink_renderable = HalfRinklPygameRenderable(hockey_rink)
@@ -130,8 +183,10 @@ def main(argv):
         pygame.init()
         clock = pygame.time.Clock()
         old_minutes_in_simulation = -1
-        for i in range(0, num_steps + 1):
-            df_step = agents_df.loc[agents_df['Step'] == i]
+        for curr_timestamp in list(model_df['timestamp']):
+        # for i in range(0, num_steps):
+            # df_step = agents_df.loc[agents_df['Step'] == i]
+            df_step = agents_df.loc[agents_df['timestamp'] == curr_timestamp]
             defenses_seen = 0
             attackers_seen = 0
             for idx, row in df_step.iterrows():
@@ -157,7 +212,8 @@ def main(argv):
                     hockey_rink.puck.pos = the_pos
                 else:
                     assert False
-            seconds_in_simulation = DATA_EVERY_SECS * i
+            # seconds_in_simulation = DATA_EVERY_SECS * i
+            seconds_in_simulation = curr_timestamp
             minutes_in_simulation = seconds_in_simulation // 60
             if minutes_in_simulation > old_minutes_in_simulation:
                 print("[%s] Minute %d of simulation" % (time.ctime(), minutes_in_simulation))
