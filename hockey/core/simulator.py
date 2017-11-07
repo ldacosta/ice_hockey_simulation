@@ -62,6 +62,7 @@ class ScenarioSimulator(Simulator):
             self.save_to = os.path.join(ScenarioSimulator.MODELS_DIR, save_to_file_name)
 
     def run(self):
+        import xcs.bitstrings
         def show_good_rules(model):
             good_rules = 0
             for rule in model:

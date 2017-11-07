@@ -1,10 +1,9 @@
 import math
 import random
 
-import numpy as np
-from geometry.angle import AngleInRadians, rotatePoint
+from geometry.angle import AngleInRadians
 from geometry.point import Point
-from geometry.vector import Vec2d, angle_between
+from geometry.vector import Vec2d
 from typing import Tuple, List, Optional
 
 from core.behaviour import Brain
@@ -146,13 +145,26 @@ class Player(ObjectOnIce, Sensor):
         self.angle_looking_at.randomly_mutate()
         self.speed = self.speed_on_xy()
 
-    def __vector_me_to_puck__(self) -> Vec2d:
-        return Vec2d.from_to(from_pt=self.pos, to_pt=self.model.puck.pos)
+    def __vector_me_to_puck__(self) -> Optional[Vec2d]:
+        """If I see the puck, this is the vector to it."""
+        if not self.can_see_puck():
+            # print("Can't calculate a vector to puck because I don't see it") # TODO: put this on a log
+            return None
+        return self.model.vector_to_puck(self.pos)
 
     def __pt_in_front_of_me__(self) -> Point:
         """Point that it's right in front of 'my eyes' at a distance of 'reach' """
         as_vector = self.vector_looking_at().normalized() * self.reach
         return Point(self.pos.x + as_vector.x, self.pos.y + as_vector.y)
+
+    def distance_to_puck_opt(self) -> Optional[float]:
+        """Distance (in feet) of player that generated this state to the puck."""
+        v = self.__vector_me_to_puck__()
+        if v is None: # I can't calculate vector to puck: probably I can't see the puck.
+            return None
+        else:
+            return v.norm()
+
 
     def can_reach_puck(self) -> bool:
         if self.unable_to_play_puck_time > 0:
@@ -160,27 +172,65 @@ class Player(ObjectOnIce, Sensor):
         elif not self.can_see_puck():
             return False # if I can't see the puck, I can't reach it.
         else:
-            d_to_puck = self.model.distance_to_puck(self.pos)
+            d_to_puck = self.distance_to_puck_opt()
+            a_to_puck = self.angle_to_puck_opt()
             # print("[my reach = %.2f feet] d to puck = %.2f feet" % (player.reach, d_to_puck))
-            return (round(d_to_puck, 3) <= round(self.reach, 3)) and \
-                   (self.angle_to_puck().value <= AngleInRadians.PI_HALF)
+            return (d_to_puck is not None) and \
+                   (round(d_to_puck, 3) <= round(self.reach, 3)) and \
+                   (a_to_puck is not None) and \
+                   (a_to_puck.value <= AngleInRadians.PI_HALF)
 
-    def angle_to_puck(self) -> AngleInRadians:
-        v_me_to_puck = self.__vector_me_to_puck__()
-        v_front_of_me = self.vector_looking_at()
-        return angle_between(v1=v_me_to_puck, v2=v_front_of_me)
+    def angle_to_puck_opt(self) -> Optional[AngleInRadians]:
+        """
+        Angle to puck, defined in [0, 2Pi]. If puck is at the right of the vector
+        defined by a straight line right in front of me, then this angle will be in [Pi, 2Pi]
+        If it's at my left, the angle is in [0,Pi]
+        """
+        angle = self.model.angle_to_puck(self.pos, self.vector_looking_at())
+        if (angle.value <= AngleInRadians.PI_HALF) or (angle.value >= AngleInRadians.THREE_HALFS_OF_PI):
+            return angle
+        else:
+            return None
 
-    def angles_to_goal(self) -> Tuple[AngleInRadians, AngleInRadians]:
-        """Returns 2 vectors: 1 for each vertical post."""
-        one_post = Point(x=self.model.goal_position[0], y=self.model.goal_position[1][0])
-        other_post = Point(x=self.model.goal_position[0], y=self.model.goal_position[1][1])
-        v_to_one_post = Vec2d.from_to(from_pt=self.pos, to_pt=one_post)
-        v_to_other_post = Vec2d.from_to(from_pt=self.pos, to_pt=other_post)
-        v_front_of_me = self.vector_looking_at()
-        return (angle_between(v1=v_to_one_post, v2=v_front_of_me), angle_between(v1=v_to_one_post, v2=v_to_other_post))
+    def angles_to_goal(self) -> Tuple[Optional[AngleInRadians], Optional[AngleInRadians]]:
+        """
+        Returns 2 vectors: 1 for each vertical post.
+        Angles are defined in [0, 2Pi]. If puck is at the right of the vector
+        defined by a straight line right in front of me, then this angle will be in [Pi, 2Pi]
+        If it's at my left, the angle is in [0,Pi]
+        """
+        def angle_visible(an_angle: AngleInRadians) -> bool:
+            return (an_angle.value <= AngleInRadians.PI_HALF) or (an_angle.value >= AngleInRadians.THREE_HALFS_OF_PI)
+        a1, a2 = self.model.angles_to_goal(a_pos=self.pos, looking_at=self.vector_looking_at())
+        if not angle_visible(a1):
+            r1 = None
+        else:
+            r1 = a1
+        if not angle_visible(a2):
+            r2 = None
+        else:
+            r2 = a2
+        return (r1, r2)
+        # one_post = Point(x=self.model.goal_position[0], y=self.model.goal_position[1][0])
+        # other_post = Point(x=self.model.goal_position[0], y=self.model.goal_position[1][1])
+        # v_to_one_post = Vec2d.from_to(from_pt=self.pos, to_pt=one_post)
+        # v_to_other_post = Vec2d.from_to(from_pt=self.pos, to_pt=other_post)
+        # v_front_of_me = self.vector_looking_at()
+        # return (v_front_of_me.angle_to(v_to_one_post), v_front_of_me.angle_to(v_to_other_post))
 
-    def min_angle_to_goal(self) -> AngleInRadians:
-        return min(self.angles_to_goal())
+    def min_angle_to_goal_opt(self) -> Optional[AngleInRadians]:
+        """TODO: """
+        # TODO: this thing returns None's!
+        a1, a2 = self.angles_to_goal()
+        if a1 is None and a2 is None:
+            return None
+        else:
+            if a1 is None:
+                return a2
+            elif a2 is None:
+                return a1
+            else:
+                return min(self.angles_to_goal())
 
     def on_top_of_puck(self) -> bool:
         """True if the player is on top of puck."""
@@ -190,15 +240,28 @@ class Player(ObjectOnIce, Sensor):
         if self.on_top_of_puck():
             return True
         else:
-            return self.angle_to_puck().value <= AngleInRadians.PI_HALF
+            angle_to_puck = self.angle_to_puck_opt()
+            return angle_to_puck is not None and \
+                   ((angle_to_puck.value <= AngleInRadians.PI_HALF) or
+                    (angle_to_puck.value >= AngleInRadians.THREE_HALFS_OF_PI))
+
+    def can_see_goal_posts(self) -> Tuple[bool, bool]:
+        """Can I see the FRONT of the goal posts?"""
+        if self.pos.x > self.model.goal_position[0]: # I am behind the goal
+            return (False, False)
+        a1, a2 = self.angles_to_goal()
+        return (a1 is not None, a2 is not None)
+
+    def distance_to_goal_posts(self) -> Tuple[Optional[float], Optional[float]]:
+        """Distance, in feet, to both goal posts"""
+        d1, d2 = self.model.distance_to_goal_posts(self.pos)
+        can_see_post_1, can_see_post_2 = self.can_see_goal_posts()
+        return (d1 if can_see_post_1 else None, d2 if can_see_post_2 else None)
 
     def can_see_goal(self) -> bool:
         """Can I see the front of the goal?"""
-        if self.pos.x > self.model.goal_position[0]: # I am behind the goal
-            return False
-        angle_to_one_post, angle_to_other_post = self.angles_to_goal()
-        return (angle_to_one_post.value <= AngleInRadians.PI_HALF) or \
-               (angle_to_other_post.value <= AngleInRadians.PI_HALF)
+        can_see_post_1, can_see_post_2 = self.can_see_goal_posts()
+        return can_see_post_1 or can_see_post_2
 
     def __wander_around__(self):
         self.move_around()
@@ -319,7 +382,7 @@ class Player(ObjectOnIce, Sensor):
             # print("[chase_puck][%s] I can see puck. Going towards it now" % (self.unique_id))
             self.current_speed = self.sprinting_speed # let's go FAST!
             # Turn towards puck, if needed
-            angle_to_puck = self.angle_to_puck()
+            angle_to_puck = self.angle_to_puck_opt()
             if abs(angle_to_puck.value) >= math.pi / 10:  # TODO: do something "better"
                 # print(" ====> I am looking at angle %s, angle to puck is %s, so I am turning to the sum of both" % (self.angle_looking_at, angle_to_puck))
                 self.angle_looking_at += angle_to_puck

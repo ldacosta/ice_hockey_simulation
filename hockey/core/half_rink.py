@@ -6,6 +6,7 @@ from mesa.space import ContinuousSpace
 from mesa.time import RandomActivation
 from geometry.point import Point
 from geometry.vector import Vec2d
+from geometry.angle import AngleInRadians
 
 from util.base import choose_first_option_by_roulette
 from util.geometry.lines import cells_between
@@ -28,6 +29,8 @@ class HockeyHalfRink(Model):
     GOALIE_Y_BOTTOM = HEIGHT_ICE / 2 - GOALIE_WIDTH / 2
     GOALIE_Y_TOP = GOALIE_Y_BOTTOM + GOALIE_WIDTH
     GOALIE_CENTER = Point(GOALIE_X, (GOALIE_Y_TOP + GOALIE_Y_BOTTOM) / 2)
+    GOALIE_POST_1 = Point(GOALIE_X, GOALIE_Y_BOTTOM)
+    GOALIE_POST_2 = Point(GOALIE_X, GOALIE_Y_TOP)
     OFF_FACEOFF_X = GOALIE_X - 20
     BLUE_LINE_X = 25
     NEUTRAL_FACEOFF_X = BLUE_LINE_X - 2
@@ -156,9 +159,8 @@ class HockeyHalfRink(Model):
 
     def distance_to_goal_posts(self, a_pos: Point) -> Tuple[float, float]:
         """Distance, in feet, to both goal posts"""
-        d1 = a_pos.distance_to(another_point=Point(self.GOALIE_X, self.GOALIE_Y_BOTTOM))
-        d2 = a_pos.distance_to(another_point=Point(self.GOALIE_X, self.GOALIE_Y_TOP))
-        return (d1, d2)
+        return (a_pos.distance_to(another_point=self.GOALIE_POST_1),
+                a_pos.distance_to(another_point=self.GOALIE_POST_2))
 
     def distance_to_closest_goal_post(self, a_pos: Point) -> float:
         """Distance, in feet, to closest goal post"""
@@ -214,6 +216,38 @@ class HockeyHalfRink(Model):
             print("[half-rink] Goal scored! (now %d in total). Resetting positions of agents" % (self.goals_scored))
             self.reset_positions_of_agents()
         self.update_running_flag()
+
+    def vector_to_puck(self, a_pos: Point) -> Vec2d:
+        return Vec2d.from_to(from_pt=a_pos, to_pt=self.puck.pos)
+
+    def angle_to_puck(self, a_pos: Point, looking_at: Vec2d) -> AngleInRadians:
+        """
+        Angle to puck, defined in [0, 2Pi]. If puck is at the right of the vector
+        defined by a straight line right in front of me, then this angle will be in [Pi, 2Pi]
+        If it's at my left, the angle is in [0,Pi]
+        """
+        return looking_at.angle_to(self.vector_to_puck(a_pos))
+
+    def vectors_to_goal(self, a_pos: Point) -> Tuple[Vec2d, Vec2d]:
+        return (Vec2d.from_to(from_pt=a_pos, to_pt=self.GOALIE_POST_1),
+                Vec2d.from_to(from_pt=a_pos, to_pt=self.GOALIE_POST_2))
+
+    def angles_to_goal(self, a_pos: Point, looking_at: Vec2d) -> Tuple[AngleInRadians, AngleInRadians]:
+        """
+        Angle to puck, defined in [0, 2Pi]. If puck is at the right of the vector
+        defined by a straight line right in front of me, then this angle will be in [Pi, 2Pi]
+        If it's at my left, the angle is in [0,Pi]
+        """
+        v1, v2 = self.vectors_to_goal(a_pos)
+        return (looking_at.angle_to(v1), looking_at.angle_to(v2))
+
+    def min_angle_to_goal(self, a_pos: Point, looking_at: Vec2d) -> AngleInRadians:
+        """
+        Angle to puck, defined in [0, 2Pi]. If puck is at the right of the vector
+        defined by a straight line right in front of me, then this angle will be in [Pi, 2Pi]
+        If it's at my left, the angle is in [0,Pi]
+        """
+        return min(self.angles_to_goal(a_pos, looking_at))
 
     def first_visible_goal_point_from(self, a_position: Point) -> Optional[Point]:
         """From a certain position, can I see the goal?"""

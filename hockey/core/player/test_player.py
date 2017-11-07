@@ -105,16 +105,16 @@ class TestBasePlayer(unittest.TestCase):
                 self.assertTrue(player.can_see_puck())
                 self.move_puck_to(orig_pos)
                 # (*) if puck is too far, I can't reach it
-                d_to_puck = player.model.distance_to_puck(player.pos)
+                d_to_puck = player.model.distance_to_puck_opt(player.pos)
                 # print("[my reach = %.2f feet] d to puck = %.2f feet" % (player.reach, d_to_puck))
-                if (d_to_puck <= player.reach) and (player.angle_to_puck().value <= AngleInRadians.PI_HALF):
+                if (d_to_puck <= player.reach) and (player.angle_to_puck_opt().value <= AngleInRadians.PI_HALF):
                     self.assertTrue(player.can_reach_puck(),
-                                    "I CAN'T reach puck, even though distance to puck = %.2f feet (my reach is %.2f feet) and angle to puck is %s" % (d_to_puck, player.reach, player.angle_to_puck()))
+                                    "I CAN'T reach puck, even though distance to puck = %.2f feet (my reach is %.2f feet) and angle to puck is %s" % (d_to_puck, player.reach, player.angle_to_puck_opt()))
                     # if I can reach it, then I can see it!
                     self.assertTrue(player.can_see_puck())
                 else:
                     self.assertFalse(player.can_reach_puck(),
-                                     "I CAN reach puck, even though distance to puck = %.2f feet (my reach is %.2f feet) and angle to puck is %s" % (d_to_puck, player.reach, player.angle_to_puck()))
+                                     "I CAN reach puck, even though distance to puck = %.2f feet (my reach is %.2f feet) and angle to puck is %s" % (d_to_puck, player.reach, player.angle_to_puck_opt()))
                 # (*) player can reach the puck if it is in "pt in front of him" (by definition)
                 self.move_puck_to(player.__pt_in_front_of_me__())
                 self.assertTrue(player.can_reach_puck())

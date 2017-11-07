@@ -25,11 +25,12 @@ def main(argv):
     def show_options():
         print("To run experience, do:")
         print("> animate_hockey_game.py -s <save_every_seconds> -r <record_in_minutes> -o <output_file_name>")
+        print("if <save_every_seconds> == -1 => 'record ALL steps of simulation' (warning: memory is cheap, not infinite)")
         #
         print("To display results of experience, do:")
         print("> animate_hockey_game.py -a <speedup> -i <input_file_name>")
     #
-    DATA_EVERY_SECS = 0
+    DATA_EVERY_SECS = float("inf")
     RECORD_THIS_MANY_MINUTES = 0
     output_directory = ""
     input_directory = ""
@@ -56,13 +57,16 @@ def main(argv):
         else:
             print("Unrecognized option %s" % (opt))
     #
-    if (DATA_EVERY_SECS > 0 and (speedup != 0)) or (DATA_EVERY_SECS == 0 and (speedup == 0)):
+    if (DATA_EVERY_SECS != float("inf") and (speedup != 0)) or (DATA_EVERY_SECS == float("inf") and (speedup == 0)):
         show_options()
         raise RuntimeError("Either you generate data (by specifying -s and its companions) or you display data (by setting -d). You can't do both")
-    mode_simulation = DATA_EVERY_SECS > 0 # otherwise in mode visualization
+    mode_simulation = DATA_EVERY_SECS != float("inf") # otherwise in mode visualization
     mode_visualization = not mode_simulation
     if mode_simulation:
-        if DATA_EVERY_SECS <= 0:
+        if DATA_EVERY_SECS == -1:
+            DATA_EVERY_SECS = TIME_PER_FRAME
+            print("Setting recording period to %.2f seconds" % (DATA_EVERY_SECS))
+        elif DATA_EVERY_SECS <= 0:
             raise RuntimeError("[save every seconds] parameter must be > 0 (currently %.2f)" % (DATA_EVERY_SECS))
         if RECORD_THIS_MANY_MINUTES <= 0:
             raise RuntimeError("[record this many minutes] parameter must be > 0 (currently %.2f)" % (RECORD_THIS_MANY_MINUTES))
@@ -94,7 +98,9 @@ def main(argv):
     if mode_simulation:
         mesa_simulator = MesaModelSimulator(mesa_model=hockey_rink)
         hockey_problem = BasicForwardProblem(hockey_world=hockey_rink)
+        # xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name="my_model_1.bin", save_to_file_name=None)
         xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name="my_model_1.bin", save_to_file_name="my_model_1.bin")
+        # xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name="my_model_1_2.bin", save_to_file_name="my_model_1_2.bin")
         # mesa_simulator.run()
         xcs_simulator.run()
 
@@ -154,7 +160,7 @@ def main(argv):
             seconds_in_simulation = DATA_EVERY_SECS * i
             minutes_in_simulation = seconds_in_simulation // 60
             if minutes_in_simulation > old_minutes_in_simulation:
-                print("Minute %d of simulation" % (minutes_in_simulation))
+                print("[%s] Minute %d of simulation" % (time.ctime(), minutes_in_simulation))
                 old_minutes_in_simulation = minutes_in_simulation
             tick_time = clock.tick(FPS)
             times_between_frames.append(tick_time)
