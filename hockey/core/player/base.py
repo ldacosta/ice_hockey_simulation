@@ -148,7 +148,7 @@ class Player(ObjectOnIce, Sensor):
     def __vector_me_to_puck__(self) -> Optional[Vec2d]:
         """If I see the puck, this is the vector to it."""
         if not self.can_see_puck():
-            print("Can't calculate a vector to puck because I don't see it") # TODO: put this on a log
+            # print("Can't calculate a vector to puck because I don't see it") # TODO: put this on a log
             return None
         return self.model.vector_to_puck(self.pos)
 
@@ -157,16 +157,28 @@ class Player(ObjectOnIce, Sensor):
         as_vector = self.vector_looking_at().normalized() * self.reach
         return Point(self.pos.x + as_vector.x, self.pos.y + as_vector.y)
 
+    def distance_to_puck_opt(self) -> Optional[float]:
+        """Distance (in feet) of player that generated this state to the puck."""
+        v = self.__vector_me_to_puck__()
+        if v is None: # I can't calculate vector to puck: probably I can't see the puck.
+            return None
+        else:
+            return v.norm()
+
+
     def can_reach_puck(self) -> bool:
         if self.unable_to_play_puck_time > 0:
             return False
         elif not self.can_see_puck():
             return False # if I can't see the puck, I can't reach it.
         else:
-            d_to_puck = self.model.distance_to_puck(self.pos)
+            d_to_puck = self.distance_to_puck_opt()
+            a_to_puck = self.angle_to_puck_opt()
             # print("[my reach = %.2f feet] d to puck = %.2f feet" % (player.reach, d_to_puck))
-            return (round(d_to_puck, 3) <= round(self.reach, 3)) and \
-                   (self.angle_to_puck_opt().value <= AngleInRadians.PI_HALF)
+            return (d_to_puck is not None) and \
+                   (round(d_to_puck, 3) <= round(self.reach, 3)) and \
+                   (a_to_puck is not None) and \
+                   (a_to_puck.value <= AngleInRadians.PI_HALF)
 
     def angle_to_puck_opt(self) -> Optional[AngleInRadians]:
         """
@@ -230,8 +242,8 @@ class Player(ObjectOnIce, Sensor):
         else:
             angle_to_puck = self.angle_to_puck_opt()
             return angle_to_puck is not None and \
-                   ((self.angle_to_puck_opt().value <= AngleInRadians.PI_HALF) or
-                    (self.angle_to_puck_opt().value >= AngleInRadians.THREE_HALFS_OF_PI))
+                   ((angle_to_puck.value <= AngleInRadians.PI_HALF) or
+                    (angle_to_puck.value >= AngleInRadians.THREE_HALFS_OF_PI))
 
     def can_see_goal_posts(self) -> Tuple[bool, bool]:
         """Can I see the FRONT of the goal posts?"""
