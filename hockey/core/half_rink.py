@@ -65,6 +65,7 @@ class HockeyHalfRink(Model):
                 "shots": lambda m: m.shots,
             },
             agent_reporters={
+                "timestamp": lambda agent: agent.model.schedule.steps * agent.model.one_step_in_seconds,
                 "pos_x": lambda agent : agent.pos.x,
                 "pos_y": lambda agent: agent.pos.y,
                 "speed_x": lambda agent: agent.speed.x,
