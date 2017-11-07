@@ -41,16 +41,8 @@ class EnvironmentState(CoreEnvironmentState):
     # ********************************************************************
     # Puck
 
-    def distance_to_puck_opt(self) -> Optional[float]:
-        """Distance (in feet) of player that generated this state to the puck."""
-        v = self.me.__vector_me_to_puck__()
-        if v is None: # I can't calculate vector to puck: probably I can't see the puck.
-            return None
-        else:
-            return v.norm()
-
     def __puck_closer_than__(self, n_feet: float) -> bool:
-        dist_to_puck_opt = self.distance_to_puck_opt()
+        dist_to_puck_opt = self.me.distance_to_puck_opt()
         return self.me.can_see_puck() and (dist_to_puck_opt is not None) and (dist_to_puck_opt <= n_feet)
 
     def puck_closer_than_10_feet(self) -> bool:

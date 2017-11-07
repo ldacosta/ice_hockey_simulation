@@ -1,5 +1,6 @@
 import unittest
 from random import sample as randomsample
+from xcs.bitstrings import BitString as XCSBitString, BitCondition
 
 from hockey.core.half_rink import HockeyHalfRink
 from geometry.angle import AngleInRadians
@@ -19,6 +20,8 @@ class TestBitstringEncoding(unittest.TestCase):
         env_state = EnvironmentState(me=self.half_ice_rink.defense[0], puck_pos_opt=None, puck_owner_opt=None)
         bitstring_state = BitstringEnvironmentState(full_state=env_state)
         bitstring_state.build_defs() # if this doesn't blow up, we're good:
+        print(BitstringEnvironmentState.explain_condition(
+            condition=BitCondition('#0#01#0111#00#00###0#00001#0011#1111#000###0000#0#00#0###0')))
         self.assertTrue(True)
 
     def test_angle_encoding(self):
