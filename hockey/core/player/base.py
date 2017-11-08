@@ -284,41 +284,32 @@ class Player(ObjectOnIce, Sensor):
 
         """
         action_taken = True
+        do_move = True # unless otherwise stated, after taking the action I have to move
         if a == HockeyAction.MOVE_RANDOM_SPEED:
             self.current_speed = self.__choose_random_speed__()
             self.speed = self.speed_on_xy()
-            self.move_by_bouncing_from_walls()
             self.last_action = "Move at random (%.2f feet/sec.) speed" % self.current_speed
         elif a == HockeyAction.SPRINT:
             self.current_speed = self.sprinting_speed
             self.speed = self.speed_on_xy()
-            self.move_by_bouncing_from_walls()
             self.last_action = "Move at SPRINTING (%.2f feet/sec.) speed" % self.current_speed
         elif a == HockeyAction.SKATE_CALMLY:
             self.current_speed = self.moving_speed
             self.speed = self.speed_on_xy()
-            self.move_by_bouncing_from_walls()
+            do_move = True
             self.last_action = "Skate calmly: (%.2f feet/sec.) speed" % self.current_speed
         elif a == HockeyAction.SPIN_RANDOMLY:
             self.spin_around()
+            self.current_speed = self.moving_speed / 10 # very low speed
+            self.speed = self.speed_on_xy()
             self.last_action = "Spin randomly"
         elif a == HockeyAction.NOOP:
             self.last_action = "NOOP"
             pass # doing nothing alright!
-        # elif a == HockeyAction.SHOOT:
-        #     # _should_ be taken care of by specific kind of player -
-        #     # but if it gets here,, let's throw the puck to a random place.
-        #     self.shoot_puck(direction=Vec2d(tuple(np.random.normal(loc=0.0, scale=5.0, size=2))))
-        #     self.move_around()
-        #     self.last_action = "Generic SHOOT [are we sure this is OK????]"
-        # elif a == HockeyAction.PASS:
-        #     self.last_action = "Generic PASS [are we sure this is OK????]"
-        #     pass  # TODO
-        # elif a == HockeyAction.CHASE_PUCK:
-        #     self.chase_puck(only_when_my_team_doesnt_have_it=True) # TODO: verify flag
-        #     self.last_action = "Chase puck"
         elif a == HockeyAction.GRAB_PUCK:
             action_taken = self.grab_puck()
+            self.current_speed = self.current_speed / 2 # grabbing the puck slows me down
+            self.speed = self.speed_on_xy()
             self.last_action = "Grab puck"
         elif bool(a & HockeyAction.MOVE):
             r = Player.direction_and_speed_from(a, power=self.power, looking_at=self.vector_looking_at())
@@ -334,26 +325,25 @@ class Player(ObjectOnIce, Sensor):
             assert (abs(la_norm.x - dir_norm.x) <= 1e-3) and (abs(la_norm.y - dir_norm.y) <= 1e-3), \
                 "looking at: %s, direction: %s" % (self.vector_looking_at().normalized(), direction.normalized())
             self.last_action = "Move => speed = %.2f feet/sec, direction = %s, so I am going %s" % (self.current_speed, self.angle_looking_at, self.speed)
-            self.move_around()
         elif bool(a & HockeyAction.SHOOT):
             r = Player.direction_and_speed_from(a, power=self.power, looking_at=self.vector_looking_at())
             assert r is not None # see the condition above
             direction, speed = r
             self.last_action = "send puck, speed = %.2f feet/sec, direction = %s" % (speed, direction)
             action_taken = self.__send_puck__(puck_speed_vector=direction, speed_multiplier=speed)
+            self.current_speed = self.current_speed / 10 # shooting drastically slows me down
+            self.speed = self.speed_on_xy()
         else:
             action_taken = False
             raise RuntimeError("Player does not know how to interpret action %s" % (a))
         # wrap-up:
+        if do_move:
+            self.move_by_bouncing_from_walls()
         if self.have_puck:
             self.model.space.place_agent(self.model.puck, self.pos)
         if not action_taken:
             self.last_action = "[FAILED] " + self.last_action
         return action_taken
-
-    # def apply_actions(self, actions: List[HockeyAction], action_handler = __parse_action__) -> bool:
-    #     actions = self.brain.propose_actions(the_state=self.sense())
-    #     return [action_handler(an_action) for an_action in actions][-1]
 
     def apply_actions(self, actions: List[HockeyAction]) -> bool:
         return [self.__parse_action__(an_action) for an_action in actions][-1]

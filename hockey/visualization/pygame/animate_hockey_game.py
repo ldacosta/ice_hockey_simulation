@@ -1,25 +1,21 @@
 
-import sys
+import sys, getopt
 import os
 import pygame
-import random
 import pandas as pd
 import time
-import numpy as np
 
 from geometry.point import Point
 from geometry.vector import Vec2d
 from hockey.core.model import TIME_PER_FRAME
 from hockey.behaviour.core.hockey_scenario import BasicForwardProblem
-from hockey.core.simulator import Simulator, MesaModelSimulator, ScenarioSimulator
+from hockey.core.simulator import MesaModelSimulator, ScenarioSimulator
 from hockey.core.half_rink import HockeyHalfRink
 from hockey.visualization.pygame.half_rink import HalfRinklPygameRenderable
 from pygame.color import THECOLORS
 
 from rendering.pygame.base import pygame_render
 from hockey.visualization.pygame.global_def import HALF_ICE_WIDTH, HALF_ICE_HEIGHT
-
-import sys, getopt
 
 def read_and_merge_dataframes(input_directory, prefix_fname: str, verbose: bool = False) -> pd.DataFrame:
     all_fnames = [os.path.join(input_directory, fname)
@@ -28,11 +24,10 @@ def read_and_merge_dataframes(input_directory, prefix_fname: str, verbose: bool 
         print("From '%s' I read %s" % (input_directory, all_fnames))
     return pd.concat(list(map(pd.read_csv, all_fnames)), ignore_index=True)
 
-
 def main(argv):
     def show_options():
         print("To run experience, do:")
-        print("> animate_hockey_game.py -s <save_every_seconds> -r <record_in_minutes> -o <output_file_name>")
+        print("> animate_hockey_game.py -s <save_every_seconds> -r <record_in_minutes> -b <brain_file> -o <output_file_name>")
         print("if <save_every_seconds> == -1 => 'record ALL steps of simulation' (warning: memory is cheap, not infinite)")
         #
         print("To display results of experience, do:")
@@ -42,9 +37,10 @@ def main(argv):
     RECORD_THIS_MANY_MINUTES = 0
     output_directory = ""
     input_directory = ""
+    brain_file_name = ""
     speedup = 0
     try:
-      opts, args = getopt.getopt(argv,"hs:r:i:o:a:",["save_every_seconds=","record_in_minutes=","input_directory=","output_directory=","acceleration"])
+      opts, args = getopt.getopt(argv,"hs:r:i:o:a:b:",["save_every_seconds=","record_in_minutes=","input_directory=","output_directory=","acceleration=","brain_file="])
     except getopt.GetoptError:
        show_options()
        sys.exit(2)
@@ -62,6 +58,8 @@ def main(argv):
             input_directory = str(arg)
         elif opt in ("-a", "--acceleration"):
             speedup = float(arg)
+        elif opt in ("-b", "--brain_file"):
+            brain_file_name = str(arg)
         else:
             print("Unrecognized option %s" % (opt))
     #
@@ -75,11 +73,17 @@ def main(argv):
             DATA_EVERY_SECS = TIME_PER_FRAME
             print("Setting recording period to %.2f seconds" % (DATA_EVERY_SECS))
         elif DATA_EVERY_SECS <= 0:
+            show_options()
             raise RuntimeError("[save every seconds] parameter must be > 0 (currently %.2f)" % (DATA_EVERY_SECS))
         if RECORD_THIS_MANY_MINUTES <= 0:
+            show_options()
             raise RuntimeError("[record this many minutes] parameter must be > 0 (currently %.2f)" % (RECORD_THIS_MANY_MINUTES))
         if output_directory == "":
+            show_options()
             raise RuntimeError("[mode = simulation] output directory must be specified")
+        if brain_file_name == "":
+            show_options()
+            raise RuntimeError("[mode = simulation] brain file must be specified")
     if mode_visualization:
         if input_directory == "":
             raise RuntimeError("[mode = visualization] input directory must be specified")
@@ -126,7 +130,7 @@ def main(argv):
         print("Trying '%s'..." % (full_agents_file_name))
         while os.path.exists(full_agents_file_name):
             num_agents_file += 1
-            agents_file_name = "agents_%d.pd" % num_model_file
+            agents_file_name = "agents_%d.pd" % num_agents_file
             full_agents_file_name = os.path.join(output_directory, agents_file_name)
             print("Trying '%s'..." % (full_agents_file_name))
         print("[Agents file] Chosen '%s'\n" % (full_agents_file_name))
@@ -134,25 +138,58 @@ def main(argv):
               % (RECORD_THIS_MANY_MINUTES, DATA_EVERY_SECS, output_directory))
         mesa_simulator = MesaModelSimulator(mesa_model=hockey_rink)
         hockey_problem = BasicForwardProblem(hockey_world=hockey_rink)
+
+        # where am I going to read from?
+        if os.path.isfile(brain_file_name):
+            load_brain_from = brain_file_name
+            print("Will read existing brain from '%s'" % (load_brain_from))
+        else:
+            load_brain_from = None
+            print("WIll not read the brain from anywhere")
+        # where am I going to save to?
+        brain_dir, brain_name = os.path.split(brain_file_name)
+        if len(brain_name) == 0:
+            raise RuntimeError("Brain file specified as '%s', so it looks like you forgot the actual file name" % (brain_file_name))
+        if len(brain_dir) > 0:
+            print("[brain file name] Checking that directory '%s' is OK" % (brain_dir))
+            os.makedirs(brain_dir, exist_ok=True)
+        save_brain_to = brain_file_name
+        print("OK, will save resulting brain to '%s'" % (save_brain_to))
+
         # xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name="my_model_1.bin", save_to_file_name=None)
-        xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name="my_model_1.bin",
-                                          save_to_file_name="my_model_1.bin")
+        # xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name="my_model_1.bin",
+        #                                   save_to_file_name="my_model_1.bin")
+        xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name=load_brain_from,
+                                          save_to_file_name=save_brain_to)
         # xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name="my_model_1_2.bin", save_to_file_name="my_model_1_2.bin")
         # mesa_simulator.run()
-        xcs_simulator.run()
+        timestamp_reached = 0
+        while timestamp_reached < RECORD_THIS_MANY_MINUTES * 60:
+            print("**************** RESTART **********************; I am on timestamp %d, going to %d" % (timestamp_reached, RECORD_THIS_MANY_MINUTES * 60))
+            hockey_problem.reset()
+            xcs_simulator.run()
+            #
+            model_df = hockey_rink.datacollector.get_model_vars_dataframe()
+            timestamp_reached += model_df["timestamp"].max()
+            model_df["goals"] += max_goals
+            model_df["shots"] += max_shots
+            model_df["steps"] += max_step
+            model_df["timestamp"] += max_timestamp
 
-        model_df = hockey_rink.datacollector.get_model_vars_dataframe()
-        model_df["goals"] += max_goals
-        model_df["shots"] += max_shots
-        model_df["steps"] += max_step
-        model_df["timestamp"] += max_timestamp
+            agents_df = hockey_rink.datacollector.get_agent_vars_dataframe()
+            print(list(agents_df.columns.values))
+            agents_df["timestamp"] += max_timestamp
 
-        agents_df = hockey_rink.datacollector.get_agent_vars_dataframe()
-        print(list(agents_df.columns.values))
-        agents_df["timestamp"] += max_timestamp
+            model_df.to_csv(full_model_file_name)
+            agents_df.to_csv(full_agents_file_name)
 
-        model_df.to_csv(full_model_file_name)
-        agents_df.to_csv(full_agents_file_name)
+            # now update the 'max's
+
+            max_step = model_df["steps"].max()
+            max_goals = model_df["goals"].max()
+            max_shots = model_df["shots"].max()
+            max_timestamp = model_df["timestamp"].max()
+            print("Episode finished => I am on timestamp %d, going to %d" % (timestamp_reached, RECORD_THIS_MANY_MINUTES * 60))
     else:
         if not os.path.exists(input_directory):
             raise RuntimeError("Directory [%s] does not exist" % (input_directory))
