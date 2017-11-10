@@ -98,6 +98,7 @@ class HockeyHalfRink(Model):
     def reset_positions_of_agents(self):
         """Sets the players positions as at the beginning of an iteration."""
 
+        self.release_puck()
         self.space.place_agent(self.puck, pos = self.get_random_position())
         [self.space.place_agent(defense_player, pos = Point(self.GOALIE_X, self.get_random_position().y)) for defense_player in self.defense]
         [self.space.place_agent(attacker, pos = Point(self.BLUE_LINE_X, self.get_random_position().y)) for attacker in self.attack]
@@ -170,11 +171,14 @@ class HockeyHalfRink(Model):
     def distance_to_puck(self, a_pos: Point) -> float:
         return Vec2d.from_to(from_pt=a_pos, to_pt=self.puck.pos).norm()
 
+    def release_puck(self):
+        current_owner = self.who_has_the_puck()
+        if current_owner is not None:
+            current_owner.release_puck()
+
     def give_puck_to(self, agent):
         if not agent.have_puck:
-            current_owner = self.who_has_the_puck()
-            if current_owner is not None:
-                current_owner.release_puck()
+            self.release_puck()
             agent.have_puck = True
             self.puck.is_taken = True
             self.space.place_agent(self.puck, pos=agent.pos)
