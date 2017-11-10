@@ -61,7 +61,7 @@ class LearnToPlayHockeyProblem(Scenario, metaclass=abc.ABCMeta):
         self.players_to_sample = self.hockey_world.defense + self.hockey_world.attack
         random.shuffle(self.players_to_sample)
         self.player_sensing_idx = 0
-        self.scenario_finished = False
+        self.episode_finished = False
         self.reset()
 
     @property
@@ -71,19 +71,21 @@ class LearnToPlayHockeyProblem(Scenario, metaclass=abc.ABCMeta):
     def get_possible_actions(self):
         return self.possible_actions
 
-    def reset_players(self):
+    def reset_players_and_puck(self):
         self.player_sensing_idx = 0
         self.player_sensing = None
+        self.puck_turn_idx = random.randint(0, len(self.players_to_sample)) + 1
 
     def reset(self):
-        self.scenario_finished = False
-        self.reset_players()
+        self.episode_finished = False
+        self.reset_players_and_puck()
         self.hockey_world.reset_positions_of_agents()
 
     def more(self) -> bool:
-        if self.scenario_finished:
-            print("Scenario finished, episode will shortly wrap-up")
-        return not self.scenario_finished
+        if self.episode_finished:
+            print("**************** Episode finished, resetting stuff **************")
+            # self.reset()
+        return (not self.episode_finished) and self.hockey_world.running
         # return self.hockey_world.running
 
     def sense(self) -> BitString:
@@ -97,27 +99,8 @@ class LearnToPlayHockeyProblem(Scenario, metaclass=abc.ABCMeta):
             # end-of-TODO
             self.hockey_world.collect_data_if_is_time()
             # self.hockey_world.datacollector.collect(self.hockey_world)
-            # beginning of a cycle of sensing.
-            goals_before = self.hockey_world.goals_scored
-            shots_before = self.hockey_world.shots
-            behind_goal_line_before = self.hockey_world.puck.is_behind_goal_line()
-            # first thing we do, move the puck! (to be able to track goals/shots and give rewards for it)
-            self.hockey_world.puck.step()
-            goals_after = self.hockey_world.goals_scored
-            shots_after = self.hockey_world.shots
-            goal_scored = (goals_after > goals_before)
-            self.apply_rewards_for_goal = goal_scored
-            self.apply_rewards_for_shot = (shots_after > shots_before)
-            # if the puck crossed the end line I will count that as a "try-to-shoot" move:
-            self.apply_reward_for_trying_to_shoot = not self.apply_rewards_for_goal and \
-                                                    not self.apply_rewards_for_shot and \
-                                                    self.hockey_world.puck.is_behind_goal_line() and \
-                                                    not behind_goal_line_before
-            #
             self.hockey_world.update_running_flag()
-            if goal_scored:
-                print("[====> half-rink <*******] Goal scored! (now %d in total). Resetting positions of agents" % (self.hockey_world.goals_scored))
-                self.hockey_world.reset_positions_of_agents()
+            self.puck_turn_idx = random.randint(0, len(self.players_to_sample)) + 1
         self.player_sensing = self.players_to_sample[self.player_sensing_idx]
         self.player_sensing.update_unable_time()
         bit_string = BitstringEnvironmentState(full_state=self.player_sensing.sense()).as_bitstring()
@@ -126,8 +109,11 @@ class LearnToPlayHockeyProblem(Scenario, metaclass=abc.ABCMeta):
 class Feedback(object):
 
     def __init__(self, simulation_seconds: int, real_date_str: str):
+        self.reset_to(simulation_seconds, real_date_str)
+
+    def reset_to(self, simulation_seconds: int, real_date_str: str):
         self.seconds_in_simulation = simulation_seconds
-        self.timestamp_simulation_str = "Minute %d:%d" % (self.seconds_in_simulation // 60, int(round(self.seconds_in_simulation % 60)))
+        self.timestamp_simulation_str = "Minute %d:%02d" % (self.seconds_in_simulation // 60, int(round(self.seconds_in_simulation % 60)))
         self.real_date_str = real_date_str
         self.msgs = []
 
@@ -186,7 +172,8 @@ class BasicForwardProblem(LearnToPlayHockeyProblem):
                 assert (action_successful == have_puck_after)
 
             seconds_in_simulation = self.hockey_world.schedule.steps * self.hockey_world.one_step_in_seconds
-            self.feedback = Feedback(simulation_seconds=seconds_in_simulation, real_date_str=time.ctime())
+            # self.feedback = Feedback(simulation_seconds=seconds_in_simulation, real_date_str=time.ctime())
+            self.feedback.reset_to(simulation_seconds=seconds_in_simulation, real_date_str=time.ctime())
             if (self.seconds_in_simulation_last_feedback < 0) or \
                     (self.seconds_in_simulation_last_feedback <= seconds_in_simulation - 3 * 60):
                 add_to_feedback("%d seconds (minute %d) elapsed in simulation" % (seconds_in_simulation, seconds_in_simulation // 60), force=True)
@@ -237,11 +224,53 @@ class BasicForwardProblem(LearnToPlayHockeyProblem):
                         # print("[HAVE NO PUCK] GOT FARTHER FROM PUCK => reward = %.2f" % (-reward_get_closer_to_puck))
                         reward += -self.reward_get_closer_to_puck
                         add_to_feedback("DON'T Have the puck, got away from it. Cumulated reward = %.2f" % (reward))
+
+            if self.puck_turn_idx == self.player_sensing_idx + 1:
+                # ok then, move the puck! (and track goals/shots and give rewards for it)
+                goals_before = self.hockey_world.goals_scored
+                shots_before = self.hockey_world.shots
+                behind_goal_line_before = self.hockey_world.puck.is_behind_goal_line()
+                self.hockey_world.puck.step()
+                goals_after = self.hockey_world.goals_scored
+                shots_after = self.hockey_world.shots
+                goal_scored = (goals_after > goals_before)
+                self.apply_rewards_for_goal = goal_scored
+                self.apply_rewards_for_shot = (shots_after > shots_before)
+                # if the puck crossed the end line I will count that as a "try-to-shoot" move:
+                self.apply_reward_for_trying_to_shoot = not self.apply_rewards_for_goal and \
+                                                        not self.apply_rewards_for_shot and \
+                                                        self.hockey_world.puck.is_behind_goal_line() and \
+                                                        not behind_goal_line_before
+                # if goal_scored:
+                #     print("[====> half-rink <*******] Goal scored! (now %d in total). Resetting positions of agents" % (
+                #     self.hockey_world.goals_scored))
+                #     self.hockey_world.reset_positions_of_agents()
+                # # Rewards associated with action I did in the past:
+                # if self.apply_rewards_for_goal:
+                #     add_to_feedback("APPLY REWARD FOR GOAL (cumulated reward is %.2f)" % (reward), force=True)
+                #     reward = LearnToPlayHockeyProblem.REWARD_FOR_GOAL
+                # elif self.apply_rewards_for_shot:
+                #     add_to_feedback("APPLY REWARD FOR SHOT (cumulated reward is %.2f)" % (reward), force=True)
+                #     reward = self.reward_shot
+                # elif self.apply_reward_for_trying_to_shoot:
+                #     sl = StraightLine.goes_by(
+                #         point_1=(0, self.reward_shot),
+                #         point_2=((self.hockey_world.WIDTH_HALF_ICE - self.hockey_world.GOALIE_WIDTH) / 2,
+                #                  0))  # TODO: factorize this, take it out of here.
+                #     dist = self.hockey_world.distance_to_closest_goal_post(self.hockey_world.puck.pos)
+                #     reward = sl.apply_to(an_x=dist)
+                #     add_to_feedback("Apply reward for trying to shoot: distance is %.2f feet, reward is %.2f (for an actual shot is %.2f)" % (dist, reward, self.reward_shot), force=True)
+
+            # has this episode finished?
+            self.episode_finished = have_puck_after
+            if have_puck_after:
+                # Before whatever wrapping up goes on we need to record feedback:
+                self.hockey_world.datacollector.collect(self.hockey_world) # non-forcing would be: self.hockey_world.collect_data_if_is_time()
+                add_to_feedback("Agent [%s] has the puck, episode finished." % (self.player_sensing.unique_id))
             if not self.feedback.is_empty():
                 add_to_feedback("[action: %s]  ===============> returning reward %.2f" % (action, reward))
                 print("%s" % (self.feedback))
                 self.seconds_in_simulation_last_feedback = seconds_in_simulation
-            self.scenario_finished = have_puck_after
             return reward
 
 class Full5On5Rewards(LearnToPlayHockeyProblem):
