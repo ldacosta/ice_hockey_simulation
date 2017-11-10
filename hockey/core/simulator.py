@@ -1,4 +1,4 @@
-
+#
 
 import abc
 import pickle
@@ -7,13 +7,13 @@ from pathlib import Path
 import os
 import time
 
+from hockey.behaviour.core.hockey_scenario import LearnToPlayHockeyProblem
 from typing import Optional
 import xcs
-from xcs.scenarios import Scenario
-from xcs import XCSAlgorithm
 import logging
-from xcs import XCSAlgorithm
-from xcs.scenarios import MUXProblem, ScenarioObserver
+from xcs.scenarios import ScenarioObserver
+import xcs.bitstrings
+
 
 class Simulator(metaclass=abc.ABCMeta):
 
@@ -48,9 +48,9 @@ class ScenarioSimulator(Simulator):
     MODELS_DIR = "/tmp/luis/models" # TODO: change!!!!!
     os.makedirs(MODELS_DIR, exist_ok=True)
 
-    def __init__(self, xcs_scenario: Scenario, load_from_file_name: Optional[str], save_to_file_name: Optional[str]):
+    def __init__(self, xcs_scenario: LearnToPlayHockeyProblem, load_from_file_name: Optional[str], save_to_file_name: Optional[str]):
         Simulator.__init__(self)
-        self.scenario = ScenarioObserver(xcs_scenario)
+        self.hockey_problem = xcs_scenario
         self.running = False
         if load_from_file_name is None:
             self.load_from = None
@@ -61,8 +61,15 @@ class ScenarioSimulator(Simulator):
         else:
             self.save_to = os.path.join(ScenarioSimulator.MODELS_DIR, save_to_file_name)
 
+    def run_until_done(self):
+        while self.hockey_problem.hockey_world.running:
+            print("run_until_done -> iterating")
+            self.run()
+            self.hockey_problem.reset()
+        print("run_until_done -> DONE")
+
     def run(self):
-        import xcs.bitstrings
+        self.scenario = ScenarioObserver(self.hockey_problem)
         def show_good_rules(model):
             good_rules = 0
             for rule in model:
