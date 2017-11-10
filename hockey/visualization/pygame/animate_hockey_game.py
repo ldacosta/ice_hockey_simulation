@@ -163,33 +163,49 @@ def main(argv):
                                           save_to_file_name=save_brain_to)
         # xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name="my_model_1_2.bin", save_to_file_name="my_model_1_2.bin")
         # mesa_simulator.run()
-        timestamp_reached = 0
-        while timestamp_reached < RECORD_THIS_MANY_MINUTES * 60:
-            print("**************** RESTART **********************; I am on timestamp %d, going to %d" % (timestamp_reached, RECORD_THIS_MANY_MINUTES * 60))
-            hockey_problem.reset()
-            xcs_simulator.run()
-            #
-            model_df = hockey_rink.datacollector.get_model_vars_dataframe()
-            timestamp_reached += model_df["timestamp"].max()
-            model_df["goals"] += max_goals
-            model_df["shots"] += max_shots
-            model_df["steps"] += max_step
-            model_df["timestamp"] += max_timestamp
 
-            agents_df = hockey_rink.datacollector.get_agent_vars_dataframe()
-            print(list(agents_df.columns.values))
-            agents_df["timestamp"] += max_timestamp
+        xcs_simulator.run_until_done() # run()
+        #
+        model_df = hockey_rink.datacollector.get_model_vars_dataframe()
+        model_df["goals"] += max_goals
+        model_df["shots"] += max_shots
+        model_df["steps"] += max_step
+        model_df["timestamp"] += max_timestamp
 
-            model_df.to_csv(full_model_file_name)
-            agents_df.to_csv(full_agents_file_name)
+        agents_df = hockey_rink.datacollector.get_agent_vars_dataframe()
+        print(list(agents_df.columns.values))
+        agents_df["timestamp"] += max_timestamp
 
-            # now update the 'max's
+        model_df.to_csv(full_model_file_name)
+        agents_df.to_csv(full_agents_file_name)
 
-            max_step = model_df["steps"].max()
-            max_goals = model_df["goals"].max()
-            max_shots = model_df["shots"].max()
-            max_timestamp = model_df["timestamp"].max()
-            print("Episode finished => I am on timestamp %d, going to %d" % (timestamp_reached, RECORD_THIS_MANY_MINUTES * 60))
+        # timestamp_reached = 0
+        # while timestamp_reached < RECORD_THIS_MANY_MINUTES * 60:
+        #     print("**************** RESTART **********************; I am on timestamp %d, going to %d" % (timestamp_reached, RECORD_THIS_MANY_MINUTES * 60))
+        #     hockey_problem.reset()
+        #     xcs_simulator.run()
+        #     #
+        #     model_df = hockey_rink.datacollector.get_model_vars_dataframe()
+        #     timestamp_reached += model_df["timestamp"].max()
+        #     model_df["goals"] += max_goals
+        #     model_df["shots"] += max_shots
+        #     model_df["steps"] += max_step
+        #     model_df["timestamp"] += max_timestamp
+        #
+        #     agents_df = hockey_rink.datacollector.get_agent_vars_dataframe()
+        #     print(list(agents_df.columns.values))
+        #     agents_df["timestamp"] += max_timestamp
+        #
+        #     model_df.to_csv(full_model_file_name)
+        #     agents_df.to_csv(full_agents_file_name)
+        #
+        #     # now update the 'max's
+        #
+        #     max_step = model_df["steps"].max()
+        #     max_goals = model_df["goals"].max()
+        #     max_shots = model_df["shots"].max()
+        #     max_timestamp = model_df["timestamp"].max()
+        #     print("Episode finished => I am on timestamp %d, going to %d" % (timestamp_reached, RECORD_THIS_MANY_MINUTES * 60))
     else:
         if not os.path.exists(input_directory):
             raise RuntimeError("Directory [%s] does not exist" % (input_directory))
