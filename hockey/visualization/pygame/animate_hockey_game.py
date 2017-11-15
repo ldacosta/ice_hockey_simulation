@@ -139,13 +139,6 @@ def main(argv):
         mesa_simulator = MesaModelSimulator(mesa_model=hockey_rink)
         hockey_problem = BasicForwardProblem(hockey_world=hockey_rink)
 
-        # where am I going to read from?
-        if os.path.isfile(brain_file_name):
-            load_brain_from = brain_file_name
-            print("Will read existing brain from '%s'" % (load_brain_from))
-        else:
-            load_brain_from = None
-            print("WIll not read the brain from anywhere")
         # where am I going to save to?
         brain_dir, brain_name = os.path.split(brain_file_name)
         if len(brain_name) == 0:
@@ -155,6 +148,14 @@ def main(argv):
             os.makedirs(brain_dir, exist_ok=True)
         save_brain_to = brain_file_name
         print("OK, will save resulting brain to '%s'" % (save_brain_to))
+        # where am I going to read from?
+        load_brain_from = brain_file_name
+        # if os.path.isfile(brain_file_name):
+        #     load_brain_from = brain_file_name
+        #     print("Will read existing brain from '%s'" % (load_brain_from))
+        # else:
+        #     load_brain_from = None
+        #     print("WIll not read the brain from anywhere")
 
         # xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name="my_model_1.bin", save_to_file_name=None)
         # xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name="my_model_1.bin",
@@ -256,7 +257,11 @@ def main(argv):
                     hockey_rink.defense[defenses_seen].speed = hockey_rink.defense[defenses_seen].speed_on_xy()
                     defenses_seen += 1
                 elif agent_id.startswith("forward"):
-                    hockey_rink.attack[attackers_seen].pos = the_pos
+                    try:
+                        hockey_rink.attack[attackers_seen].pos = the_pos
+                    except Exception as e:
+                        print("Exception of timestamp %d: %s" % (curr_timestamp, e))
+                        print("attackers_seen = %d, len(hockey_rink.attack) = %d" % (attackers_seen, len(hockey_rink.attack)))
                     hockey_rink.attack[attackers_seen].angle_looking_at = speed_angle
                     hockey_rink.attack[attackers_seen].current_speed = speed_amplitude
                     hockey_rink.attack[attackers_seen].speed = hockey_rink.attack[attackers_seen].speed_on_xy()

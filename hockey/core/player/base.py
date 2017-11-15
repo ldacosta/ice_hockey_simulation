@@ -3,7 +3,7 @@ import random
 
 from geometry.angle import AngleInRadians
 from geometry.point import Point
-from geometry.vector import Vec2d
+from geometry.vector import Vec2d, NULL_VECTOR
 from typing import Tuple, List, Optional
 
 from core.behaviour import Brain
@@ -24,7 +24,7 @@ class Player(ObjectOnIce, Sensor):
     MIN_SPEED_SPRINTING = 29
     MAX_SPEED_SPRINTING = 44
     # 'height' is in feet
-    MIN_HEIGHT = 4
+    MIN_HEIGHT = 6
     MAX_HEIGHT = 7
     # power: serves for puck possession and for shooting
     MIN_POWER = 1
@@ -49,6 +49,18 @@ class Player(ObjectOnIce, Sensor):
                                  a: HockeyAction,
                                  power: float,
                                  looking_at: Vec2d) -> Optional[Tuple[Vec2d, float]]:
+        """
+        
+        Args:
+            a: 
+            power: 
+            looking_at: 
+
+        Returns:
+            On success: A tuple with direction, speed. On returning speed = -1 we indicate that speed should be kept as is.
+            On error: None.
+
+        """
         if bool(a & HockeyAction.SHOOT):
             s_line = cls.SHOOT_STRAIGHT_LINE
         elif bool(a & HockeyAction.MOVE):
@@ -57,10 +69,19 @@ class Player(ObjectOnIce, Sensor):
             return None  # this doesn't look like a speed/direction flag.
 
         # speed of the action
-        if bool(a & HockeyAction.HARD):
+        if bool(a & HockeyAction.FULL_POWER):
             speed = s_line.apply_to(an_x=power)
-        elif bool(a & HockeyAction.SOFT):
-            speed = s_line.apply_to(an_x=power) / 2 # TODO: ok, this?
+        elif bool(a & HockeyAction.HALF_POWER):
+            speed = s_line.apply_to(an_x=power/2)
+        elif bool(a & HockeyAction.THIRD_OF_POWER):
+            speed = s_line.apply_to(an_x=power / 3)
+        elif bool(a & HockeyAction.MIN_POWER):
+            speed = 10
+        elif bool(a & HockeyAction.NO_POWER):
+            # I didn't put this to 0 because it leads to numerical errors down the line (on vector speed with norm=0; maybe TODO?)
+            speed = 0.01
+        elif bool(a & HockeyAction.KEEP_SPEED):
+            speed = -1
         else:
             return None  # this doesn't look like a speed/direction flag.
         # which direction should I apply this angle?
@@ -104,28 +125,67 @@ class Player(ObjectOnIce, Sensor):
         """Returns a speed between 'moving' and 'sprinting' speeds."""
         return random_between(self.moving_speed, self.sprinting_speed)
 
+    def __set_speed_from__(self,
+                           an_angle_opt: Optional[AngleInRadians] = None,
+                           a_speed_opt: Optional[float] = None) -> bool:
+        """Sets speed vector from parameters. Returns True if speed was changed."""
+        angle_looking_at = an_angle_opt if (an_angle_opt is not None) else self.speed.angle_with_positive_x_axis()
+        current_speed = a_speed_opt if (a_speed_opt is not None) else self.speed.norm()
+        if (an_angle_opt is not None) or (a_speed_opt is not None):
+            self.speed = Vec2d.from_angle(angle_looking_at).scaled_to_norm(current_speed)
+            return True
+        else:
+            return False
 
     def __init__(self, prefix_on_id: str, hockey_world_model, brain: Brain):
-        self.height = random_between(Player.MIN_HEIGHT, Player.MAX_HEIGHT)
-        self.reach = stick_length_for_height(self.height * INCHES_IN_FOOT) / INCHES_IN_FOOT # in feet
-        self.angle_looking_at = AngleInRadians.random()
-        self.moving_speed = random_between(Player.MIN_SPEED_MOVING, Player.MAX_SPEED_MOVING)
-        self.sprinting_speed = random_between(Player.MIN_SPEED_SPRINTING, Player.MAX_SPEED_SPRINTING)
-        self.current_speed = self.__choose_random_speed__()
-        self.power = random_between(Player.MIN_POWER, Player.MAX_POWER)
-        self.brain = brain
         ObjectOnIce.__init__(self, prefix_on_id, hockey_world_model,
                          size=3, # feet
-                         pos_opt=None,
-                         speed_opt=self.speed_on_xy())
+                         pos_opt=None)
         Sensor.__init__(self, environment=hockey_world_model)
+        self.height = random_between(Player.MIN_HEIGHT, Player.MAX_HEIGHT)
+        self.reach = stick_length_for_height(self.height * INCHES_IN_FOOT) / INCHES_IN_FOOT + (self.height / 2) # in feet
+        self.moving_speed = random_between(Player.MIN_SPEED_MOVING, Player.MAX_SPEED_MOVING)
+        self.sprinting_speed = random_between(Player.MIN_SPEED_SPRINTING, Player.MAX_SPEED_SPRINTING)
+        self.power = random_between(Player.MIN_POWER, Player.MAX_POWER)
+        self.brain = brain
         self.have_puck = False
+        self.reset(to_angle=AngleInRadians.random(), to_speed=0.01) # very slow speed, random direction, to start
+
+    def reset(self, to_speed: Optional[float] = None, to_angle: Optional[AngleInRadians] = None):
+        """Resets speed and puck ownership"""
+
+        self.__set_speed_from__(an_angle_opt=to_angle, a_speed_opt=to_speed)
+        self.release_puck()
         self.unable_to_play_puck_time = 0.0
-        self.speed = self.speed_on_xy()
         self.last_action = "" # last action performed
+
+    def __str__(self):
+        # TODO: complete!
+        return \
+            "height = %.2f feet, reach = %.2f feet\n" % (self.height, self.reach) + \
+            "speed: %s (norm = %.2f feet/sec)\n" % (self.speed, self.current_speed()) + \
+            "Have puck = %s" % (self.have_puck)
+
+
+    def angle_looking_at(self) -> AngleInRadians:
+        return self.speed.angle_with_positive_x_axis()
+
+    def current_speed(self) -> float:
+        """In feet per second."""
+        return self.speed.norm()
+
+    def vector_looking_at(self) -> Vec2d:
+        return self.speed.normalized()
 
     def __setattr__(self, name, value):
         self.__dict__[name] = value
+        # the 'speed' depends on (1) the angle and (2) the actual speed.
+        # So I want to update that vector when either change:
+        # if (name == "angle_looking_at") or (name == "current_speed"):
+        #     if ("angle_looking_at" in self.__dict__) and ("current_speed" in self.__dict__):
+        #         self.__dict__["speed"] = self.speed_on_xy()
+        #     else:
+        #         self.__dict__["speed"] = NULL_VECTOR
 
     def sense(self) -> EnvironmentState:
         from hockey.behaviour.core.environment_state import EnvironmentState as HockeyEnvironmentState
@@ -134,18 +194,15 @@ class Player(ObjectOnIce, Sensor):
             puck_owner_opt=self.model.who_has_the_puck(),
             puck_pos_opt=self.model.puck.pos)
 
-    def speed_on_xy(self) -> Vec2d:
-        return self.vector_looking_at() * self.current_speed
-
     def move_around(self):
         # maybe irrealistic, but it'll do for now:
         self.move_by_bouncing_from_walls()
 
-    def spin_around(self):
-        self.angle_looking_at.randomly_mutate()
-        self.speed = self.speed_on_xy()
+    def spin_around(self) -> bool:
+        """True on success, False otherwise."""
+        return self.__set_speed_from__(an_angle_opt=AngleInRadians.random())
 
-    def __vector_me_to_puck__(self) -> Optional[Vec2d]:
+    def __vector_me_to_puck_opt__(self) -> Optional[Vec2d]:
         """If I see the puck, this is the vector to it."""
         if not self.can_see_puck():
             # print("Can't calculate a vector to puck because I don't see it") # TODO: put this on a log
@@ -159,7 +216,7 @@ class Player(ObjectOnIce, Sensor):
 
     def distance_to_puck_opt(self) -> Optional[float]:
         """Distance (in feet) of player that generated this state to the puck."""
-        v = self.__vector_me_to_puck__()
+        v = self.__vector_me_to_puck_opt__()
         if v is None: # I can't calculate vector to puck: probably I can't see the puck.
             return None
         else:
@@ -171,6 +228,8 @@ class Player(ObjectOnIce, Sensor):
             return False
         elif not self.can_see_puck():
             return False # if I can't see the puck, I can't reach it.
+        elif self.on_top_of_puck():
+            return True # YEAH!
         else:
             d_to_puck = self.distance_to_puck_opt()
             a_to_puck = self.angle_to_puck_opt()
@@ -178,7 +237,8 @@ class Player(ObjectOnIce, Sensor):
             return (d_to_puck is not None) and \
                    (round(d_to_puck, 3) <= round(self.reach, 3)) and \
                    (a_to_puck is not None) and \
-                   (a_to_puck.value <= AngleInRadians.PI_HALF)
+                   ((a_to_puck <= AngleInRadians(AngleInRadians.PI_HALF)) or
+                    (a_to_puck >= AngleInRadians(AngleInRadians.THREE_HALFS_OF_PI)))
 
     def angle_to_puck_opt(self) -> Optional[AngleInRadians]:
         """
@@ -187,7 +247,8 @@ class Player(ObjectOnIce, Sensor):
         If it's at my left, the angle is in [0,Pi]
         """
         angle = self.model.angle_to_puck(self.pos, self.vector_looking_at())
-        if (angle.value <= AngleInRadians.PI_HALF) or (angle.value >= AngleInRadians.THREE_HALFS_OF_PI):
+        if angle <= AngleInRadians(AngleInRadians.PI_HALF) or \
+                        angle >= AngleInRadians(AngleInRadians.THREE_HALFS_OF_PI):
             return angle
         else:
             return None
@@ -241,9 +302,9 @@ class Player(ObjectOnIce, Sensor):
             return True
         else:
             angle_to_puck = self.angle_to_puck_opt()
-            return angle_to_puck is not None and \
-                   ((angle_to_puck.value <= AngleInRadians.PI_HALF) or
-                    (angle_to_puck.value >= AngleInRadians.THREE_HALFS_OF_PI))
+            return (angle_to_puck is not None) and \
+                   ((angle_to_puck <= AngleInRadians(AngleInRadians.PI_HALF)) or
+                    (angle_to_puck >= AngleInRadians(AngleInRadians.THREE_HALFS_OF_PI)))
 
     def can_see_goal_posts(self) -> Tuple[bool, bool]:
         """Can I see the FRONT of the goal posts?"""
@@ -273,6 +334,12 @@ class Player(ObjectOnIce, Sensor):
             self.model.puck_request_by(self)
         return self.have_puck
 
+
+    def align_with_puck(self) -> bool:
+        """Sets the speed's angle such that it aligns with puck."""
+        self.speed = self.model.vector_to_puck(self.pos).scaled_to_norm(self.speed.norm())
+        return True
+
     def __parse_action__(self, a: HockeyAction) -> bool:
         """
         
@@ -285,54 +352,41 @@ class Player(ObjectOnIce, Sensor):
         """
         action_taken = True
         do_move = True # unless otherwise stated, after taking the action I have to move
-        if a == HockeyAction.MOVE_RANDOM_SPEED:
-            self.current_speed = self.__choose_random_speed__()
-            self.speed = self.speed_on_xy()
-            self.last_action = "Move at random (%.2f feet/sec.) speed" % self.current_speed
-        elif a == HockeyAction.SPRINT:
-            self.current_speed = self.sprinting_speed
-            self.speed = self.speed_on_xy()
-            self.last_action = "Move at SPRINTING (%.2f feet/sec.) speed" % self.current_speed
-        elif a == HockeyAction.SKATE_CALMLY:
-            self.current_speed = self.moving_speed
-            self.speed = self.speed_on_xy()
-            do_move = True
-            self.last_action = "Skate calmly: (%.2f feet/sec.) speed" % self.current_speed
-        elif a == HockeyAction.SPIN_RANDOMLY:
-            self.spin_around()
-            self.current_speed = self.moving_speed / 10 # very low speed
-            self.speed = self.speed_on_xy()
-            self.last_action = "Spin randomly"
-        elif a == HockeyAction.NOOP:
-            self.last_action = "NOOP"
-            pass # doing nothing alright!
-        elif a == HockeyAction.GRAB_PUCK:
+        if a == HockeyAction.GRAB_PUCK:
             action_taken = self.grab_puck()
-            self.current_speed = self.current_speed / 2 # grabbing the puck slows me down
-            self.speed = self.speed_on_xy()
+            if action_taken:
+                self.__set_speed_from__(a_speed_opt=self.current_speed() / 2) # grabbing the puck slows me down
             self.last_action = "Grab puck"
+        elif a == HockeyAction.ALIGN_WITH_PUCK:
+            action_taken = self.align_with_puck()
+            self.last_action = "Align with puck"
         elif bool(a & HockeyAction.MOVE):
             r = Player.direction_and_speed_from(a, power=self.power, looking_at=self.vector_looking_at())
             assert r is not None # see the condition above
             direction, speed = r
-            self.angle_looking_at = direction.angle_with_positive_x_axis()
-            # print("direction is %s, angle_with_x is %s" % (direction, direction.angle_with_positive_x_axis()))
-            self.current_speed = speed
-            self.speed = self.speed_on_xy()
+            old_speed = self.speed
+            self.__set_speed_from__(an_angle_opt=direction.angle_with_positive_x_axis(),
+                                    a_speed_opt=speed if speed >= 0 else None)
             # mini sanity-check
-            la_norm =  self.vector_looking_at().normalized()
+            la_norm =  self.vector_looking_at()
             dir_norm = direction.normalized()
+            if not ((abs(la_norm.x - dir_norm.x) <= 1e-3) and (abs(la_norm.y - dir_norm.y) <= 1e-3)):
+                # redo, for debugging purposes
+                self.speed = old_speed
+                self.__set_speed_from__(an_angle_opt=direction.angle_with_positive_x_axis(),
+                                        a_speed_opt=speed if speed >= 0 else None)
+
             assert (abs(la_norm.x - dir_norm.x) <= 1e-3) and (abs(la_norm.y - dir_norm.y) <= 1e-3), \
                 "looking at: %s, direction: %s" % (self.vector_looking_at().normalized(), direction.normalized())
-            self.last_action = "Move => speed = %.2f feet/sec, direction = %s, so I am going %s" % (self.current_speed, self.angle_looking_at, self.speed)
+            self.last_action = "Move => speed = %.2f feet/sec, direction = %s, so I am going %s" % (self.current_speed(), self.angle_looking_at(), self.speed)
         elif bool(a & HockeyAction.SHOOT):
             r = Player.direction_and_speed_from(a, power=self.power, looking_at=self.vector_looking_at())
             assert r is not None # see the condition above
             direction, speed = r
+            assert speed > 0
             self.last_action = "send puck, speed = %.2f feet/sec, direction = %s" % (speed, direction)
             action_taken = self.__send_puck__(puck_speed_vector=direction, speed_multiplier=speed)
-            self.current_speed = self.current_speed / 10 # shooting drastically slows me down
-            self.speed = self.speed_on_xy()
+            self.__set_speed_from__(a_speed_opt=self.current_speed()/10) # shooting drastically slows me down
         else:
             action_taken = False
             raise RuntimeError("Player does not know how to interpret action %s" % (a))
@@ -343,7 +397,23 @@ class Player(ObjectOnIce, Sensor):
             self.model.space.place_agent(self.model.puck, self.pos)
         if not action_taken:
             self.last_action = "[FAILED] " + self.last_action
+        if (a == HockeyAction.GRAB_PUCK) and action_taken:
+            assert self.have_puck
+        # Sanity check: whatever I do. at the end sanity should prevail:
+        self.__sanity_check_or_explode__()
         return action_taken
+
+    def __sanity_check_or_explode__(self):
+        """Properties that have to hold at all moments"""
+
+        # vector looking at is normalized
+        assert abs(self.vector_looking_at().norm() - 1.0) < 1e-3, \
+            "self.vector_looking_at().norm() = %.2f" % self.vector_looking_at().norm()
+        #
+        if self.current_speed() != 0:
+            assert self.speed.normalized() == self.vector_looking_at(), \
+                "angle looking at = %s, current speed = %.2f, speed = %s, looking at = %s" % \
+                (self.angle_looking_at(), self.current_speed(), self.speed.normalized(), self.vector_looking_at())
 
     def apply_actions(self, actions: List[HockeyAction]) -> bool:
         return [self.__parse_action__(an_action) for an_action in actions][-1]
@@ -352,10 +422,10 @@ class Player(ObjectOnIce, Sensor):
         return self.apply_actions(self.brain.propose_actions(the_state=self.sense())) #, action_handler=self.__parse_action__)
 
     def turn_left(self):
-        self.angle_looking_at += (math.pi / 2)
+        self.__set_speed_from__(an_angle_opt=AngleInRadians(self.angle_looking_at().value + AngleInRadians.PI_HALF))
 
     def turn_right(self):
-        self.angle_looking_at -= (math.pi / 2)
+        self.__set_speed_from__(an_angle_opt=AngleInRadians(self.angle_looking_at().value - AngleInRadians.PI_HALF))
 
     def is_puck_owned_by_my_team(self) -> bool:
         current_owner = self.model.who_has_the_puck()
@@ -367,31 +437,11 @@ class Player(ObjectOnIce, Sensor):
     def first_visible_goal_point(self) -> Optional[Point]:
         return self.model.first_visible_goal_point_from(a_position=self.pos)
 
-    def chase_puck(self, only_when_my_team_doesnt_have_it: bool) -> bool:
-        """Skate as fast as possible in the direction of the puck."""
-        if self.can_see_puck():
-            # print("[chase_puck][%s] I can see puck. Going towards it now" % (self.unique_id))
-            self.current_speed = self.sprinting_speed # let's go FAST!
-            # Turn towards puck, if needed
-            angle_to_puck = self.angle_to_puck_opt()
-            if abs(angle_to_puck.value) >= math.pi / 10:  # TODO: do something "better"
-                # print(" ====> I am looking at angle %s, angle to puck is %s, so I am turning to the sum of both" % (self.angle_looking_at, angle_to_puck))
-                self.angle_looking_at += angle_to_puck
-            self.speed = self.speed_on_xy()
-        else:
-            # print("[chase_puck][%s] I can't see puck. " % (self.unique_id))
-            # I can neither reach or even see the puck
-            if random.random() < 0.5:
-                self.turn_left()
-            else:
-                self.turn_right()
-        self.move_by_bouncing_from_walls()
-        return True
-
     def release_puck(self):
         if self.have_puck:
             self.have_puck = False
             self.model.puck.set_free()
+            self.model.puck.speed = Vec2d(0,0)
 
     def __send_puck__(self, puck_speed_vector: Vec2d, speed_multiplier: float) -> bool:
         if self.have_puck:
@@ -409,9 +459,6 @@ class Player(ObjectOnIce, Sensor):
     def pass_puck(self, this_position: Point) -> bool:
         direction = Vec2d.from_to(self.pos, this_position)
         return self.__send_puck__(puck_speed_vector=direction, speed_multiplier=Player.PASS_SPEED) # TODO: vary speed? Maybe?
-
-    def vector_looking_at(self) -> Vec2d:
-        return Vec2d.from_angle(self.angle_looking_at)
 
     def update_unable_time(self):
         self.unable_to_play_puck_time = max(0, self.unable_to_play_puck_time - TIME_PER_FRAME)

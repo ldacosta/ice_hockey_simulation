@@ -38,8 +38,12 @@ class LearnToPlayHockeyProblem(Scenario, metaclass=abc.ABCMeta):
         # I will remove atomic actions for which I don't want to respond (or don't know how to):
         self.possible_actions.remove(HockeyAction.SHOOT)
         self.possible_actions.remove(HockeyAction.MOVE)
-        self.possible_actions.remove(HockeyAction.HARD)
-        self.possible_actions.remove(HockeyAction.SOFT)
+        self.possible_actions.remove(HockeyAction.FULL_POWER)
+        self.possible_actions.remove(HockeyAction.HALF_POWER)
+        self.possible_actions.remove(HockeyAction.THIRD_OF_POWER)
+        self.possible_actions.remove(HockeyAction.MIN_POWER)
+        self.possible_actions.remove(HockeyAction.NO_POWER)
+        self.possible_actions.remove(HockeyAction.KEEP_SPEED)
         self.possible_actions.remove(HockeyAction.LEFT)
         self.possible_actions.remove(HockeyAction.RIGHT)
         self.possible_actions.remove(HockeyAction.RADIANS_0)
@@ -62,6 +66,7 @@ class LearnToPlayHockeyProblem(Scenario, metaclass=abc.ABCMeta):
         random.shuffle(self.players_to_sample)
         self.player_sensing_idx = 0
         self.episode_finished = False
+        self.episode_start_in_secs = self.seconds_in_simulation()
         self.reset()
 
     @property
@@ -79,32 +84,41 @@ class LearnToPlayHockeyProblem(Scenario, metaclass=abc.ABCMeta):
     def reset(self):
         self.episode_finished = False
         self.reset_players_and_puck()
-        self.hockey_world.reset_positions_of_agents()
+        self.hockey_world.reset()
+        self.episode_start_in_secs = self.seconds_in_simulation()
+        print("[scenario reset] ice world = %s" % (self.hockey_world))
+        # sanity check
+        assert not self.hockey_world.puck.is_taken
+
+    def seconds_in_simulation(self) -> int:
+        return self.hockey_world.schedule.steps * self.hockey_world.one_step_in_seconds
 
     def more(self) -> bool:
         if self.episode_finished:
-            print("**************** Episode finished, resetting stuff **************")
-            # self.reset()
+            print("%d seconds (minute %d) elapsed in simulation **************** Episode finished (lasted %.2f secs), resetting stuff **************" %
+                  (self.seconds_in_simulation(), self.seconds_in_simulation() // 60, self.seconds_in_simulation() - self.episode_start_in_secs))
+            self.update_world_simulation()
         return (not self.episode_finished) and self.hockey_world.running
-        # return self.hockey_world.running
+
+    def update_world_simulation(self):
+        # horrible, next 2 lines. Have to put it to reproduce what is done on half-rink. TODO: revisit it!
+        self.hockey_world.schedule.steps += 1
+        self.hockey_world.schedule.time += 1
+        # end-of-TODO
+        self.hockey_world.collect_data_if_is_time()
+        # self.hockey_world.datacollector.collect(self.hockey_world)
+        self.hockey_world.update_running_flag()
 
     def sense(self) -> BitString:
         # senses each one of the players in the world, one after the other
         self.player_sensing_idx = (self.player_sensing_idx + 1) % len(self.players_to_sample)
         if self.player_sensing_idx == 0:
             # sampled everyone. Move the puck, make world tick, restart.
-            # horrible, next 2 lines. Have to put it to reproduce what is done on half-rink. TODO: revisit it!
-            self.hockey_world.schedule.steps += 1
-            self.hockey_world.schedule.time += 1
-            # end-of-TODO
-            self.hockey_world.collect_data_if_is_time()
-            # self.hockey_world.datacollector.collect(self.hockey_world)
-            self.hockey_world.update_running_flag()
+            self.update_world_simulation()
             self.puck_turn_idx = random.randint(0, len(self.players_to_sample)) + 1
         self.player_sensing = self.players_to_sample[self.player_sensing_idx]
         self.player_sensing.update_unable_time()
-        bit_string = BitstringEnvironmentState(full_state=self.player_sensing.sense()).as_bitstring()
-        return bit_string
+        return BitstringEnvironmentState(full_state=self.player_sensing.sense()).as_bitstring()
 
 class Feedback(object):
 
@@ -171,7 +185,7 @@ class BasicForwardProblem(LearnToPlayHockeyProblem):
             if action == HockeyAction.GRAB_PUCK:
                 assert (action_successful == have_puck_after)
 
-            seconds_in_simulation = self.hockey_world.schedule.steps * self.hockey_world.one_step_in_seconds
+            seconds_in_simulation = self.seconds_in_simulation()
             # self.feedback = Feedback(simulation_seconds=seconds_in_simulation, real_date_str=time.ctime())
             self.feedback.reset_to(simulation_seconds=seconds_in_simulation, real_date_str=time.ctime())
             if (self.seconds_in_simulation_last_feedback < 0) or \
@@ -265,7 +279,7 @@ class BasicForwardProblem(LearnToPlayHockeyProblem):
             self.episode_finished = have_puck_after
             if have_puck_after:
                 # Before whatever wrapping up goes on we need to record feedback:
-                self.hockey_world.datacollector.collect(self.hockey_world) # non-forcing would be: self.hockey_world.collect_data_if_is_time()
+                # self.hockey_world.datacollector.collect(self.hockey_world) # non-forcing would be: self.hockey_world.collect_data_if_is_time()
                 add_to_feedback("Agent [%s] has the puck, episode finished." % (self.player_sensing.unique_id))
             if not self.feedback.is_empty():
                 add_to_feedback("[action: %s]  ===============> returning reward %.2f" % (action, reward))

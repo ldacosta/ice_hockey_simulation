@@ -24,6 +24,10 @@ class Puck(ObjectOnIce):
         self.is_taken = False
         self.prob_of_goal = 0.0 # If this puck where to end up in the goal, what is the probability that it would be a goal?
 
+    def __str__(self):
+        return "[puck] taken = %s, pos = %s, speed = %s, KINETIC_FRICTION_COEF = %.2f" % \
+               (self.is_taken, self.pos, self.speed, Puck.KINETIC_FRICTION_COEF)
+
     def __setattr__(self, name, value):
         if name == "prob_of_goal":
             if name in self.__dict__:

@@ -7,6 +7,7 @@ from pathlib import Path
 import os
 import time
 
+from hockey.behaviour.core.bitstring_environment_state import BitstringEnvironmentState
 from hockey.behaviour.core.hockey_scenario import LearnToPlayHockeyProblem
 from typing import Optional
 import xcs
@@ -62,20 +63,38 @@ class ScenarioSimulator(Simulator):
             self.save_to = os.path.join(ScenarioSimulator.MODELS_DIR, save_to_file_name)
 
     def run_until_done(self):
+        start_time = time.time()
         while self.hockey_problem.hockey_world.running:
-            print("run_until_done -> iterating")
             self.run()
             self.hockey_problem.reset()
+            elapsed_time = time.time() - start_time
+            print("run_until_done -> time so far: %.2f secs. (minute %d)" % (elapsed_time, int(elapsed_time // 60)))
         print("run_until_done -> DONE")
 
     def run(self):
         self.scenario = ScenarioObserver(self.hockey_problem)
         def show_good_rules(model):
+            dict = {}
+            dict.get("lalala", "default")
+            for rule in model:
+                dict[rule.action] = dict.get(rule.action, []) + [rule]
+            print("Actions: %s" %  (dict.keys()))
+            dict.update((k, sorted(rule_list, key=lambda rule: rule.fitness, reverse=True)) for k, rule_list in dict.items())
+            print("Best rules: ")
+            for act, rule_list in dict.items():
+                print("%s: %s" % (act, rule_list[0]))
+
+
             good_rules = 0
             for rule in model:
                 if rule.fitness > .5:
                     good_rules += 1
                     print(rule.condition, '=>', rule.action, ' [%.5f, experience: %d]' % (rule.fitness, rule.experience))
+                    # if rule.fitness > .75:
+                    #     print("********************************************************************")
+                    #     print(rule.condition, '=>', rule.action,
+                    #           ' [%.5f, experience: %d]' % (rule.fitness, rule.experience))
+                    #     print(BitstringEnvironmentState.explain_condition(condition=rule.condition))
 
             if good_rules < 5:
                 print("Only %d 'good' rules found" % good_rules)
@@ -120,19 +139,26 @@ class ScenarioSimulator(Simulator):
             # scenario you have selected.
             print("Creating new algorithm for scenario...")
             model = algorithm.new_model(self.scenario)
-        print("Done")
+        print("Loading/Creation Done")
 
+        model.algorithm.exploration_probability = .25
+        model.algorithm.crossover_probability = .25
+        model.algorithm.mutation_probability = .02
+        model.algorithm.discount_factor = 0.95 # 0.02 #
+
+        # print(model.algorithm.discount_factor)
+        # input("Press Enter to start simulation...")
         # Run the classifier set in the scenario, optimizing it as the
         # scenario unfolds.
         model.run(self.scenario, learn=True)
 
         # Get a quick list of the best classifiers discovered.
-        show_good_rules(model)
+        # show_good_rules(model)
 
         if (self.save_to is not None):
             print("Saving model into file '%s'..." % (self.save_to))
             pickle.dump(model, open(self.save_to, 'wb'))
-            print("Done")
+            print("Saving Done")
 
         # steps, reward, seconds, model = xcs.test(algorithm, scenario=self.scenario) # algorithm=XCSAlgorithm,
         self.running = False
