@@ -1,7 +1,7 @@
 
 from typing import Optional, Tuple
 from geometry.point import Point
-from geometry.angle import AngleInRadians
+from geometry.angle import AngleInRadians, AngleInDegrees
 from core.environment_state import EnvironmentState as CoreEnvironmentState
 from hockey.core.player.base import Player
 from hockey.core.player.forward import Forward
@@ -18,6 +18,52 @@ class EnvironmentState(CoreEnvironmentState):
         self.me = me
         self.puck_owner_opt = puck_owner_opt
         self.puck_pos_opt = puck_pos_opt
+
+    def update(self):
+        def __bits_angle_to_puck__(angle2puck_opt: Optional[AngleInRadians]) -> Optional[str]:
+            """
+            Returns a bit representation of this angle in DEGREES, with usual semantics (repr[i] is bit i)
+            Args:
+                angle2puck_opt: 
+
+            Returns:
+                the angle in degrees, in binary format.
+
+            """
+            if angle2puck_opt is None:
+                return None
+            degrees = AngleInDegrees.from_radians(angle_in_radians=angle2puck_opt)
+            degrees_value = int(round(degrees.value))
+            # print("radians = %s, degrees = %s (value = %d)" % (angle2puck_opt, degrees, degrees_value))
+            if degrees_value >= 270:
+                return self.__int_to_bits__(an_int=int(round(360-degrees_value)), how_many_bits=7)
+            elif degrees_value <= 90:
+                return self.__int_to_bits__(an_int=int(round(degrees_value)), how_many_bits=7)
+            else:
+                raise RuntimeError("How come %d degrees????" % degrees_value)
+            #
+            # if angle2puck_opt >= AngleInRadians(AngleInRadians.THREE_HALFS_OF_PI):
+            #     return self.__int_to_bits__(an_int=int(round(AngleInRadians.PI * 2 - angle2puck_opt.value)),
+            #                                 how_many_bits=7)
+            # else:  # angle_to_puck_opt <= AngleInRadians(AngleInRadians.PI_HALF):
+            #     return self.__int_to_bits__(an_int=int(round(angle2puck_opt.value)), how_many_bits=7)
+
+        def __bits_distance_to_puck__(dist_to_puck_opt: Optional[float]) -> Optional[str]:
+            """Returns a bit representation of this distance, with usual semantics (repr[i] is bit i)"""
+            if dist_to_puck_opt is None:
+                return None
+            return self.__int_to_bits__(an_int=int(round(dist_to_puck_opt)), how_many_bits=8)
+
+        def __bits_speed__(speed_in_ft_per_sec: float) -> str:
+            """Returns a bit representation of this distance, with usual semantics (repr[i] is bit i)"""
+            return self.__int_to_bits__(an_int=int(round(speed_in_ft_per_sec)), how_many_bits=6)
+
+        self.distance2puck_opt = self.me.distance_to_puck_opt()
+        self.distance2puck_bits_opt = __bits_distance_to_puck__(self.distance2puck_opt)
+        self.angle2puck_opt = self.me.angle_to_puck_opt()
+        self.angle2puck_bits_opt = __bits_angle_to_puck__(self.angle2puck_opt)
+        self.skating_speed = self.me.current_speed()
+        self.skating_speed_bits = __bits_speed__(self.skating_speed)
 
     def attacking(self) -> bool:
         return (type(self.me) == Forward)
@@ -41,6 +87,44 @@ class EnvironmentState(CoreEnvironmentState):
     # ********************************************************************
     # Puck
 
+    def __int_to_bits__(self, an_int: int, how_many_bits: int) -> str:
+        """Returns a bit representation of a number, with usual semantics (repr[i] is bit i)"""
+        result = "{0:b}".format(an_int)[::-1]
+        assert len(result) <= how_many_bits, \
+            "To encode number %d we need %d bits - but %d are allowed" % (an_int, len(result), how_many_bits)
+        return result + ("0" * (how_many_bits - len(result)))
+
+    def __bit_i_distance_to_puck__(self, i: int) -> int:
+        bits = self.distance2puck_bits_opt
+        if bits is None:
+            return 0
+        else:
+            return int(bits[i])
+
+    def bit_0_distance_to_puck(self) -> int:
+        return self.__bit_i_distance_to_puck__(0)
+
+    def bit_1_distance_to_puck(self) -> int:
+        return self.__bit_i_distance_to_puck__(1)
+
+    def bit_2_distance_to_puck(self) -> int:
+        return self.__bit_i_distance_to_puck__(2)
+
+    def bit_3_distance_to_puck(self) -> int:
+        return self.__bit_i_distance_to_puck__(3)
+
+    def bit_4_distance_to_puck(self) -> int:
+        return self.__bit_i_distance_to_puck__(4)
+
+    def bit_5_distance_to_puck(self) -> int:
+        return self.__bit_i_distance_to_puck__(5)
+
+    def bit_6_distance_to_puck(self) -> int:
+        return self.__bit_i_distance_to_puck__(6)
+
+    def bit_7_distance_to_puck(self) -> int:
+        return self.__bit_i_distance_to_puck__(7)
+
     def __puck_closer_than__(self, n_feet: float) -> bool:
         dist_to_puck_opt = self.me.distance_to_puck_opt()
         return self.me.can_see_puck() and (dist_to_puck_opt is not None) and (dist_to_puck_opt <= n_feet)
@@ -63,10 +147,78 @@ class EnvironmentState(CoreEnvironmentState):
     def puck_closer_than_60_feet(self) -> bool:
         return self.__puck_closer_than__(60)
 
+    def __bit_i_speed_to_puck__(self, i: int) -> int:
+        bits = self.skating_speed_bits
+        if bits is None:
+            return 0
+        else:
+            return int(bits[i])
+
+    def bit_0_speed_to_puck(self) -> int:
+        return self.__bit_i_speed_to_puck__(0)
+
+    def bit_1_speed_to_puck(self) -> int:
+        return self.__bit_i_speed_to_puck__(1)
+
+    def bit_2_speed_to_puck(self) -> int:
+        return self.__bit_i_speed_to_puck__(2)
+
+    def bit_3_speed_to_puck(self) -> int:
+        return self.__bit_i_speed_to_puck__(3)
+
+    def bit_4_speed_to_puck(self) -> int:
+        return self.__bit_i_speed_to_puck__(4)
+
+    def bit_5_speed_to_puck(self) -> int:
+        return self.__bit_i_speed_to_puck__(5)
+
+
+    def __bit_i_angle_to_puck__(self, i: int) -> int:
+        bits = self.angle2puck_bits_opt
+        if bits is None:
+            return 0
+        else:
+            return int(bits[i])
+
+    def bit_0_angle_to_puck(self) -> int:
+        return self.__bit_i_angle_to_puck__(0)
+
+    def bit_1_angle_to_puck(self) -> int:
+        return self.__bit_i_angle_to_puck__(1)
+
+    def bit_2_angle_to_puck(self) -> int:
+        return self.__bit_i_angle_to_puck__(2)
+
+    def bit_3_angle_to_puck(self) -> int:
+        return self.__bit_i_angle_to_puck__(3)
+
+    def bit_4_angle_to_puck(self) -> int:
+        return self.__bit_i_angle_to_puck__(4)
+
+    def bit_5_angle_to_puck(self) -> int:
+        return self.__bit_i_angle_to_puck__(5)
+
+    def bit_6_angle_to_puck(self) -> int:
+        return self.__bit_i_angle_to_puck__(6)
+
+
+
+
+
+    def puck_straight_ahead(self) -> bool:
+        """Can I See the puck approx right ahead?"""
+        angle_to_puck = self.me.angle_to_puck_opt()
+        # is my puck more or less 10 degrees away from me?
+        return ((angle_to_puck is not None) and
+                ((angle_to_puck.value <= AngleInRadians.PI_HALF/5) or
+                 (angle_to_puck.value >= (AngleInRadians.PI * 2 - AngleInRadians.PI_HALF/5))))
+
     def puck_to_my_right(self) -> bool:
         """Can I See the puck to my right?"""
         angle_to_puck = self.me.angle_to_puck_opt()
-        return ((angle_to_puck is not None) and (angle_to_puck.value >= AngleInRadians.THREE_HALFS_OF_PI))
+        return ((angle_to_puck is not None) and
+                (angle_to_puck.value >= AngleInRadians.THREE_HALFS_OF_PI) and
+                not self.puck_straight_ahead())
 
     def puck_to_my_left(self) -> bool:
         """Can I See the puck to my left?"""

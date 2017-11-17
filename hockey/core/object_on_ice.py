@@ -127,7 +127,7 @@ class ObjectOnIce(Agent):
         except Exception as e:
             print("hello")
             raise e
-        self.speed = Vec2d.origin_to(Point(new_speed_x, new_speed_y)) # Vector2D.from_tip ((new_speed_x, new_speed_y))
+        self.speed = Vec2d.origin_to(Point(new_speed_x, new_speed_y))
 
     @abc.abstractmethod
     def move_around(self):

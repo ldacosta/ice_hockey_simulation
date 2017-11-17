@@ -21,7 +21,7 @@ class TestBitstringEncoding(unittest.TestCase):
         bitstring_state = BitstringEnvironmentState(full_state=env_state)
         bitstring_state.build_defs() # if this doesn't blow up, we're good:
         print(BitstringEnvironmentState.explain_condition(
-            condition=BitCondition('#0#01#0111#00#00###0#00001#0011#1111#000###0000#0#00#0###0')))
+            condition=BitCondition('1#00####1#100000###0#00#000#11##1111#0##00##00#00#0#000#00')))
         self.assertTrue(True)
 
     def test_angle_encoding(self):
