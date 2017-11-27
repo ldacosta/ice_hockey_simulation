@@ -76,7 +76,7 @@ class Player(ObjectOnIce, Sensor):
         elif bool(a & HockeyAction.THIRD_OF_POWER):
             speed = s_line.apply_to(an_x=power / 3)
         elif bool(a & HockeyAction.MIN_POWER):
-            speed = 10
+            speed = 1
         elif bool(a & HockeyAction.NO_POWER):
             # I didn't put this to 0 because it leads to numerical errors down the line (on vector speed with norm=0; maybe TODO?)
             speed = 0.01
@@ -163,6 +163,7 @@ class Player(ObjectOnIce, Sensor):
         # TODO: complete!
         return \
             "height = %.2f feet, reach = %.2f feet\n" % (self.height, self.reach) + \
+            "position: %s\n" % (self.pos) + \
             "speed: %s (norm = %.2f feet/sec)\n" % (self.speed, self.current_speed()) + \
             "Have puck = %s" % (self.have_puck)
 
@@ -334,9 +335,10 @@ class Player(ObjectOnIce, Sensor):
             self.model.puck_request_by(self)
         return self.have_puck
 
-
     def align_with_puck(self) -> bool:
         """Sets the speed's angle such that it aligns with puck."""
+        if (self.on_top_of_puck()):
+            return True
         self.speed = self.model.vector_to_puck(self.pos).scaled_to_norm(self.speed.norm())
         return True
 
@@ -352,12 +354,12 @@ class Player(ObjectOnIce, Sensor):
         """
         action_taken = True
         do_move = True # unless otherwise stated, after taking the action I have to move
-        if a == HockeyAction.GRAB_PUCK:
-            action_taken = self.grab_puck()
-            if action_taken:
-                self.__set_speed_from__(a_speed_opt=self.current_speed() / 2) # grabbing the puck slows me down
-            self.last_action = "Grab puck"
-        elif a == HockeyAction.ALIGN_WITH_PUCK:
+        # if a == HockeyAction.GRAB_PUCK:
+        #     action_taken = self.grab_puck()
+        #     if action_taken:
+        #         self.__set_speed_from__(a_speed_opt=self.current_speed() / 2) # grabbing the puck slows me down
+        #     self.last_action = "Grab puck"
+        if a == HockeyAction.ALIGN_WITH_PUCK:
             action_taken = self.align_with_puck()
             self.last_action = "Align with puck"
         elif bool(a & HockeyAction.MOVE):
@@ -397,10 +399,17 @@ class Player(ObjectOnIce, Sensor):
             self.model.space.place_agent(self.model.puck, self.pos)
         if not action_taken:
             self.last_action = "[FAILED] " + self.last_action
-        if (a == HockeyAction.GRAB_PUCK) and action_taken:
-            assert self.have_puck
+        # if (a == HockeyAction.GRAB_PUCK) and action_taken:
+        #     assert self.have_puck
         # Sanity check: whatever I do. at the end sanity should prevail:
         self.__sanity_check_or_explode__()
+        # grab the puck if you're REALLY close to it!
+        if self.can_reach_puck():
+            action_taken = self.grab_puck()
+            print("GRAB PUCK BY PROXIMITY => succeeded? -> %s" % (action_taken))
+            assert action_taken
+            assert self.have_puck
+
         return action_taken
 
     def __sanity_check_or_explode__(self):
