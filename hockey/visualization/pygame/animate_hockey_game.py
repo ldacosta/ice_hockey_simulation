@@ -8,7 +8,7 @@ import time
 from geometry.point import Point
 from geometry.vector import Vec2d
 from hockey.core.model import TIME_PER_FRAME
-from hockey.behaviour.core.hockey_scenario import BasicForwardProblem
+from hockey.behaviour.core.hockey_scenario import GrabThePuckProblem
 from hockey.core.simulator import MesaModelSimulator, ScenarioSimulator
 from hockey.core.half_rink import HockeyHalfRink
 from hockey.visualization.pygame.half_rink import HalfRinklPygameRenderable
@@ -137,12 +137,12 @@ def main(argv):
         print("Will record %d minutes of simulated action, snapshots every %.2f seconds; will then save output in %s"
               % (RECORD_THIS_MANY_MINUTES, DATA_EVERY_SECS, output_directory))
         mesa_simulator = MesaModelSimulator(mesa_model=hockey_rink)
-        hockey_problem = BasicForwardProblem(hockey_world=hockey_rink)
+        hockey_problem = GrabThePuckProblem(hockey_world=hockey_rink)
 
         # where am I going to save to?
         brain_dir, brain_name = os.path.split(brain_file_name)
-        if len(brain_name) == 0:
-            raise RuntimeError("Brain file specified as '%s', so it looks like you forgot the actual file name" % (brain_file_name))
+        # if len(brain_name) == 0:
+        #     raise RuntimeError("Brain file specified as '%s', so it looks like you forgot the actual file name" % (brain_file_name))
         if len(brain_dir) > 0:
             print("[brain file name] Checking that directory '%s' is OK" % (brain_dir))
             os.makedirs(brain_dir, exist_ok=True)
@@ -160,8 +160,10 @@ def main(argv):
         # xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name="my_model_1.bin", save_to_file_name=None)
         # xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name="my_model_1.bin",
         #                                   save_to_file_name="my_model_1.bin")
-        xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name=load_brain_from,
-                                          save_to_file_name=save_brain_to)
+        xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem,
+                                          load_from_dir_name=brain_dir,
+                                          load_from_file_name=None if len(brain_name) == 0 else brain_name,
+                                          save_to_dir_name=brain_dir)
         # xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name="my_model_1_2.bin", save_to_file_name="my_model_1_2.bin")
         # mesa_simulator.run()
 

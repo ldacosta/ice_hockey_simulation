@@ -145,22 +145,20 @@ class Feedback(object):
         return a_str
 
 
-class BasicForwardProblem(LearnToPlayHockeyProblem):
+class GrabThePuckProblem(LearnToPlayHockeyProblem):
     """Rewards for a would-be attacker."""
 
-    reward_get_closer_to_goal = 1  # LearnToPlayHockeyProblem.REWARD_FOR_GOAL/1000
-    reward_get_closer_to_puck = reward_get_closer_to_goal
     reward_shot = LearnToPlayHockeyProblem.REWARD_FOR_GOAL / 30  # TODO: we should reward relative to distance from goal...
     reward_get_puck = reward_shot / 10  # reward_get_closer_to_puck * 100
-    bonus_for_having_puck = 10 * max(reward_get_closer_to_goal, reward_get_closer_to_puck) + 1
-    punishment_action_failed = -reward_get_closer_to_goal/2
+    punishment_action_failed = -1/2
+    punishment_loss_energy = -1 # each time step, I lose energy
 
     def __init__(self, hockey_world: HockeyHalfRink):
         LearnToPlayHockeyProblem.__init__(self, hockey_world)
-        print("reward_get_closer_to_goal = %.2f" % (self.reward_get_closer_to_goal))
-        print("reward_get_closer_to_puck = %.2f" % (self.reward_get_closer_to_puck))
-        print("reward_shot = %.2f" % (self.reward_shot))
-        print("bonus_for_having_puck = %.2f" % (self.bonus_for_having_puck))
+        print("reward_shot = %.2f" % (GrabThePuckProblem.reward_shot))
+        print("reward_get_puck = %.2f" % (GrabThePuckProblem.reward_get_puck))
+        print("punishment_action_failed = %.2f" % (GrabThePuckProblem.punishment_action_failed))
+        print("punishment_loss_energy = %.2f" % (GrabThePuckProblem.punishment_loss_energy))
         self.seconds_in_simulation_last_feedback = -1 # when was the last time I gave feedback?
         self.feedback = Feedback(simulation_seconds=0, real_date_str=time.ctime())
 
@@ -182,8 +180,8 @@ class BasicForwardProblem(LearnToPlayHockeyProblem):
             distance_to_puck_after = self.hockey_world.distance_to_puck(self.player_sensing.pos)
             have_puck_after = self.player_sensing.have_puck
             # sanity checking
-            if action == HockeyAction.GRAB_PUCK:
-                assert (action_successful == have_puck_after)
+            # if action == HockeyAction.GRAB_PUCK:
+            #     assert (action_successful == have_puck_after)
 
             seconds_in_simulation = self.seconds_in_simulation()
             # self.feedback = Feedback(simulation_seconds=seconds_in_simulation, real_date_str=time.ctime())
@@ -192,7 +190,7 @@ class BasicForwardProblem(LearnToPlayHockeyProblem):
                     (self.seconds_in_simulation_last_feedback <= seconds_in_simulation - 3 * 60):
                 add_to_feedback("%d seconds (minute %d) elapsed in simulation" % (seconds_in_simulation, seconds_in_simulation // 60), force=True)
                 self.seconds_in_simulation_last_feedback = seconds_in_simulation
-            reward = 0  # TODO: seriously???? I thought it would be None !
+            reward = GrabThePuckProblem.punishment_loss_energy # agent loses energy by default
             # Rewards associated with action I did in the past:
             # if self.apply_rewards_for_goal:
             #     add_to_feedback("APPLY REWARD FOR GOAL (cumulated reward is %.2f)" % (reward), force=True)
@@ -213,31 +211,9 @@ class BasicForwardProblem(LearnToPlayHockeyProblem):
                 reward += self.punishment_action_failed
                 add_to_feedback("Action '%s' not successful. Cumulated reward = %.2f" % (action, reward))
             else:
-                if have_puck_after and not have_puck_before:
-                    reward += self.bonus_for_having_puck
+                if have_puck_after:
+                    reward += self.reward_get_puck
                     add_to_feedback("Grabbed puck! (cumulated reward is %.2f)" % (reward), force=True)
-                elif not have_puck_after and have_puck_before:
-                    # reward -= self.bonus_for_having_puck
-                    add_to_feedback("Lost puck :-( (cumulated reward is %.2f)" % (reward), force=True)
-                elif have_puck_after:
-                    pass
-                    # # I still have the puck. Did I get closer to goal?
-                    # if distance_to_goal_before > distance_to_goal_after:
-                    #     reward += self.reward_get_closer_to_goal
-                    #     add_to_feedback("Have the puck, got closer to goal. Cumulated reward = %.2f" % (reward))
-                    # elif distance_to_goal_before < distance_to_goal_after:
-                    #     reward -= self.reward_get_closer_to_goal
-                    #     add_to_feedback("Have the puck, got away from goal. Cumulated reward = %.2f" % (reward))
-                else:
-                    # didn't have puck before, I don't have it now. Did I get closer to puck?
-                    if distance_to_puck_before > distance_to_puck_after:
-                        # print("[HAVE NO PUCK] GOT CLOSER TO PUCK")
-                        reward += self.reward_get_closer_to_puck
-                        add_to_feedback("DON'T Have the puck, got closer. Cumulated reward = %.2f" % (reward))
-                    elif distance_to_puck_before < distance_to_puck_after:
-                        # print("[HAVE NO PUCK] GOT FARTHER FROM PUCK => reward = %.2f" % (-reward_get_closer_to_puck))
-                        reward += -self.reward_get_closer_to_puck
-                        add_to_feedback("DON'T Have the puck, got away from it. Cumulated reward = %.2f" % (reward))
 
             if self.puck_turn_idx == self.player_sensing_idx + 1:
                 # ok then, move the puck! (and track goals/shots and give rewards for it)
@@ -255,25 +231,6 @@ class BasicForwardProblem(LearnToPlayHockeyProblem):
                                                         not self.apply_rewards_for_shot and \
                                                         self.hockey_world.puck.is_behind_goal_line() and \
                                                         not behind_goal_line_before
-                # if goal_scored:
-                #     print("[====> half-rink <*******] Goal scored! (now %d in total). Resetting positions of agents" % (
-                #     self.hockey_world.goals_scored))
-                #     self.hockey_world.reset_positions_of_agents()
-                # # Rewards associated with action I did in the past:
-                # if self.apply_rewards_for_goal:
-                #     add_to_feedback("APPLY REWARD FOR GOAL (cumulated reward is %.2f)" % (reward), force=True)
-                #     reward = LearnToPlayHockeyProblem.REWARD_FOR_GOAL
-                # elif self.apply_rewards_for_shot:
-                #     add_to_feedback("APPLY REWARD FOR SHOT (cumulated reward is %.2f)" % (reward), force=True)
-                #     reward = self.reward_shot
-                # elif self.apply_reward_for_trying_to_shoot:
-                #     sl = StraightLine.goes_by(
-                #         point_1=(0, self.reward_shot),
-                #         point_2=((self.hockey_world.WIDTH_HALF_ICE - self.hockey_world.GOALIE_WIDTH) / 2,
-                #                  0))  # TODO: factorize this, take it out of here.
-                #     dist = self.hockey_world.distance_to_closest_goal_post(self.hockey_world.puck.pos)
-                #     reward = sl.apply_to(an_x=dist)
-                #     add_to_feedback("Apply reward for trying to shoot: distance is %.2f feet, reward is %.2f (for an actual shot is %.2f)" % (dist, reward, self.reward_shot), force=True)
 
             # has this episode finished?
             self.episode_finished = have_puck_after
