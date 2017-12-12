@@ -37,7 +37,8 @@ class TestBasePlayer(unittest.TestCase):
         for player in self.half_ice_rink.defense + self.half_ice_rink.attack:
             for speed_norm in randomsample(range(1, 20), 3):
                 initial_pos = Point(0,0)
-                player.model.space.move_agent(player, initial_pos)
+                player.model.move_agent(player, initial_pos)
+                # player.model.space.move_agent(player, initial_pos)
                 player.speed = Vec2d.from_angle(AngleInRadians(0)).scaled_to_norm(speed_norm)
                 print(player)
                 # in how many seconds should they "run" 75 feet?
@@ -108,7 +109,7 @@ class TestBasePlayer(unittest.TestCase):
                 orig_pos = self.half_ice_rink.puck.pos
                 for player in self.half_ice_rink.defense + self.half_ice_rink.attack:
                     self.move_puck_to(player.__pt_in_front_of_me__())
-                    v = player.__vector_me_to_puck_opt__()
+                    v = player.vector_me_to_puck_opt()
                     v.rotate(an_angle)
                     self.move_puck_to(player.pos)
                     self.half_ice_rink.puck.pos.translate_following(v)

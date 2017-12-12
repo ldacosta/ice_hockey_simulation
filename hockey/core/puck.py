@@ -28,15 +28,16 @@ class Puck(ObjectOnIce):
         return "[puck] taken = %s, pos = %s, speed = %s, KINETIC_FRICTION_COEF = %.2f" % \
                (self.is_taken, self.pos, self.speed, Puck.KINETIC_FRICTION_COEF)
 
-    def __setattr__(self, name, value):
-        if name == "prob_of_goal":
-            if name in self.__dict__:
-                if (self.__dict__[name] != value):
-                    print("Changing value of '%s' from %.2f to %.2f" % (name, self.__dict__[name], value))
-        self.__dict__[name] = value
+    # def __setattr__(self, name, value):
+    #     if name == "prob_of_goal":
+    #         if name in self.__dict__:
+    #             if (self.__dict__[name] != value):
+    #                 print("Changing value of '%s' from %.2f to %.2f" % (name, self.__dict__[name], value))
+    #     self.__dict__[name] = value
 
     def move_around(self):
         self.move_by_bouncing_from_walls(
+            for_how_long=1,
             prob_of_score_on_goal_opt=self.prob_of_goal,
             friction_constant_opt=Puck.KINETIC_FRICTION_COEF
         )

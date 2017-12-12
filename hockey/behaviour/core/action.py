@@ -157,7 +157,7 @@ class HockeyAction(Action):
 
     #
     # GRAB_PUCK = auto()
-    ALIGN_WITH_PUCK = auto()
+    # ALIGN_WITH_PUCK = auto()
     # turn
     # TURN_LEFT = MOVE | LEFT | KEEP_SPEED | RADIANS_PI_TIMES_2_OVER_10
     TURN_HARD_LEFT = MOVE | LEFT | KEEP_SPEED | RADIANS_PI_TIMES_5_OVER_10

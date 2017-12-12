@@ -115,7 +115,7 @@ class LearnToPlayHockeyProblem(Scenario, metaclass=abc.ABCMeta):
         if self.player_sensing_idx == 0:
             # sampled everyone. Move the puck, make world tick, restart.
             self.update_world_simulation()
-            self.puck_turn_idx = random.randint(0, len(self.players_to_sample)) + 1
+            self.puck_turn_idx = random.randint(0, len(self.players_to_sample))
         self.player_sensing = self.players_to_sample[self.player_sensing_idx]
         self.player_sensing.update_unable_time()
         return BitstringEnvironmentState(full_state=self.player_sensing.sense()).as_bitstring()

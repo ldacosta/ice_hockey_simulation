@@ -91,7 +91,14 @@ def main(argv):
             raise RuntimeError("[mode = visualization] input directory must be specified")
 
     # field
-    hockey_rink = HockeyHalfRink(how_many_offense=1, how_many_defense=0, one_step_in_seconds=TIME_PER_FRAME, collect_data_every_secs=DATA_EVERY_SECS, record_this_many_minutes=RECORD_THIS_MANY_MINUTES)
+    hockey_rink = HockeyHalfRink(
+        width=HockeyHalfRink.WIDTH_HALF_ICE,
+        height=HockeyHalfRink.HEIGHT_ICE,
+        how_many_offense=1,
+        how_many_defense=0,
+        one_step_in_seconds=TIME_PER_FRAME,
+        collect_data_every_secs=DATA_EVERY_SECS,
+        record_this_many_minutes=RECORD_THIS_MANY_MINUTES)
     if mode_simulation:
         os.makedirs(output_directory, exist_ok=True)
         # let's choose the name of the files were the data will be saved:

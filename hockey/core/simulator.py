@@ -2,11 +2,13 @@
 
 import abc
 import pickle
+import re
 from mesa import Model
 from pathlib import Path
 import os
 import time
 import glob
+import pandas as pd
 
 from hockey.behaviour.core.bitstring_environment_state import BitstringEnvironmentState
 from hockey.behaviour.core.hockey_scenario import LearnToPlayHockeyProblem
@@ -20,6 +22,7 @@ import numpy as np
 from geometry.point import Point
 from geometry.vector import Vec2d
 from hockey.behaviour.core.action import HockeyAction
+from hockey.core.evaluator import Evaluator
 
 
 
@@ -162,8 +165,10 @@ class ScenarioSimulator(Simulator):
             show_good_rules(model)
         print("Loading/Creation Done")
 
-        model.algorithm.exploration_probability = .25
-        # model.algorithm.crossover_probability = .25
+        model.algorithm.exploration_probability = 1e-5 # .01 # .25
+        model.algorithm.crossover_probability = .25
+        model.algorithm.do_action_set_subsumption = True
+        model.algorithm.idealization_factor = 1
         # model.algorithm.mutation_probability = .02
         # model.algorithm.discount_factor = 0.95 # 0.02 #
 
@@ -185,20 +190,49 @@ class ScenarioSimulator(Simulator):
             self.load_from_dir_name = self.save_to_dir_name
             self.load_from_file_name = brain_file_name
 
+            brain_name, brain_ext = os.path.splitext(brain_file_name)
+
+            eval_file_name = brain_name + ".eval"
+            eval_full_file_name = os.path.join(self.save_to_dir_name, eval_file_name)
+            print("Saving results of evaluation in %s" % (eval_full_file_name))
+            evaluator = Evaluator(player=self.hockey_problem.hockey_world.attack[0],
+                                  load_from_full_file_name=full_brain_file_name,
+                                  total_number_of_actions=len(self.hockey_problem.possible_actions), steps_in_height=1, steps_in_widht=1)
+            # mean_value, std_value = evaluator.quality_when_looking_at_left()
+            # TODO: not result_matrix!!!!!!!
+            pd.DataFrame(evaluator.result_matrix).to_csv(eval_full_file_name, header=None, index=None)
+            # df = pd.read_csv(eval_file_name)
+            # TODO: finish
+            print("Evaluation of Brain Done")
+
+
         # steps, reward, seconds, model = xcs.test(algorithm, scenario=self.scenario) # algorithm=XCSAlgorithm,
         self.running = False
 
     def __chose_brain_file_name(self) -> Tuple[str, str]:
         BRAIN_FILENAME_TEMPLATE = "brain_episode_%d.bin"
+        newest_brain = self.__find_newest_brain_in_dir(self.load_from_dir_name)
+        if newest_brain is None:
+            new_brain_idx = 1
+        else:
+            numbers = re.findall(r'(\d+).bin', newest_brain)
+            assert len(numbers) == 1, "newest_brain = %s, but I find several numbers (%s)" % (newest_brain, numbers)
+            new_brain_idx = int(numbers[0]) + 1
+        brain_file_name = BRAIN_FILENAME_TEMPLATE % new_brain_idx
+        full_brain_file_name = os.path.join(self.save_to_dir_name, brain_file_name)
+        return brain_file_name, full_brain_file_name
+
+    def __chose_brain_file_name2(self) -> Tuple[str, str]:
+        BRAIN_FILENAME_TEMPLATE = "brain_episode_%d.bin"
         num_brain_file = 1
         brain_file_name = BRAIN_FILENAME_TEMPLATE % num_brain_file
         full_brain_file_name = os.path.join(self.save_to_dir_name, brain_file_name)
-        print("[choose brain file name] Trying '%s'..." % (full_brain_file_name))
+        print("[choose brain file name]...")
         while os.path.exists(full_brain_file_name):
             num_brain_file += 1
             brain_file_name = BRAIN_FILENAME_TEMPLATE % num_brain_file
             full_brain_file_name = os.path.join(self.save_to_dir_name, brain_file_name)
-            print("[choose brain file name] Trying '%s'..." % (full_brain_file_name))
+        print("[choose brain file name] Chose '%s'..." % (full_brain_file_name))
         return brain_file_name, full_brain_file_name
 
     def is_running(self) -> bool:
