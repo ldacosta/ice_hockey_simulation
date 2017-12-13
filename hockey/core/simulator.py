@@ -2,30 +2,21 @@
 
 import abc
 import pickle
-import re
 from mesa import Model
 from pathlib import Path
 import os
 import time
-import glob
 import pandas as pd
 
-from hockey.behaviour.core.bitstring_environment_state import BitstringEnvironmentState
 from hockey.behaviour.core.hockey_scenario import LearnToPlayHockeyProblem
+from hockey.core.folder_manager import FolderManager
 from typing import Optional, Tuple
 import xcs
 import logging
 from xcs.scenarios import ScenarioObserver
 import xcs.bitstrings
 
-from util.base import find_newest_file_in_dir
-import numpy as np
-from geometry.point import Point
-from geometry.vector import Vec2d
-from hockey.behaviour.core.action import HockeyAction
 from hockey.core.evaluator import Evaluator
-
-
 
 class Simulator(metaclass=abc.ABCMeta):
 
@@ -62,25 +53,11 @@ class ScenarioSimulator(Simulator):
 
     def __init__(self,
                  xcs_scenario: LearnToPlayHockeyProblem,
-                 load_from_dir_name: Optional[str],
-                 load_from_file_name: Optional[str],
-                 save_to_dir_name: Optional[str]):
+                 folder_manager: FolderManager):
         Simulator.__init__(self)
         self.hockey_problem = xcs_scenario
         self.running = False
-        if load_from_dir_name is not None:
-            if not Path(load_from_dir_name).is_dir():
-                raise RuntimeError("[loading brain] '%s' is not a directory" % (load_from_dir_name))
-        self.load_from_dir_name = load_from_dir_name
-        self.load_from_file_name = load_from_file_name
-        if load_from_dir_name is not None and load_from_file_name is not None:
-            load_from = os.path.join(self.load_from_dir_name, self.load_from_file_name)
-            if not Path(load_from).is_file():
-                raise RuntimeError("[loading brain] File '%s' does not contain a brain" % (load_from))
-        if save_to_dir_name is not None:
-            if not Path(save_to_dir_name).is_dir():
-                raise RuntimeError("[saving brain] '%s' is not a directory" % (save_to_dir_name))
-        self.save_to_dir_name = save_to_dir_name
+        self.folder_manager = folder_manager
 
     def run_until_done(self):
         start_time = time.time()
@@ -90,9 +67,6 @@ class ScenarioSimulator(Simulator):
             elapsed_time = time.time() - start_time
             print("run_until_done -> time so far: %.2f secs. (minute %d)" % (elapsed_time, int(elapsed_time // 60)))
         print("run_until_done -> DONE")
-
-    def __find_newest_brain_in_dir(self, directory: str) -> Optional[str]:
-        return find_newest_file_in_dir(directory, file_pattern='*.bin')
 
     def run(self):
         self.scenario = ScenarioObserver(self.hockey_problem)
@@ -126,36 +100,13 @@ class ScenarioSimulator(Simulator):
         # algorithm.deletion_threshold = 1
         # algorithm.mutation_probability = .002
 
-
-
-        # Use the built-in pickle module to save/reload your model for reuse.
-        # import pickle
-        # pickle.dump(model, open('model.bin', 'wb'))
-        # reloaded_model = pickle.load(open('model.bin', 'rb'))
-
-        # scenario = MUXProblem()
-        # algorithm = XCSAlgorithm()
-        # algorithm.exploration_probability = .1
-        # model = algorithm.run(self.scenario)
-
-
-        create_new = False
-        if self.load_from_dir_name is None:
-            create_new = True
-        elif self.load_from_file_name is None:
-            load_from = self.__find_newest_brain_in_dir(self.load_from_dir_name)
-            if load_from is None:
-                create_new = True
-        else:
-            load_from = os.path.join(self.load_from_dir_name, self.load_from_file_name)
-            if not Path(load_from).is_file():
-                raise RuntimeError("File '%s' does not contain a brain" % (load_from))
-        if create_new:
-            # Create a classifier set from the algorithm, tailored for the
-            # scenario you have selected.
+        load_from = self.folder_manager.newest_brain_file()
+        if load_from is None:
             print("Creating new algorithm for scenario...")
             model = algorithm.new_model(self.scenario)
         else:
+            if not Path(load_from).is_file():
+                raise RuntimeError("File '%s' does not contain a brain" % (load_from))
             last_modified_str = time.ctime(os.stat(load_from).st_mtime)
             print("Loading model from file '%s' (last modified on %s)..." % (load_from, last_modified_str))
             model = pickle.load(open(load_from, 'rb'))
@@ -178,59 +129,27 @@ class ScenarioSimulator(Simulator):
         # Get a quick list of the best classifiers discovered.
         # show_good_rules(model)
 
-        if self.save_to_dir_name is not None:
-            brain_file_name, full_brain_file_name = self.__chose_brain_file_name()
-            print("Saving model into file '%s'..." % (full_brain_file_name))
-            pickle.dump(model, open(full_brain_file_name, 'wb'))
-            print("Saving Done")
-            # set up next loading
-            self.load_from_dir_name = self.save_to_dir_name
-            self.load_from_file_name = brain_file_name
+        idx, full_brain_file_name = self.folder_manager.chose_brain_file_name()
+        # brain_file_name, full_brain_file_name = self.folder_manager.chose_brain_file_name()
+        print("Saving model into file '%s'..." % (full_brain_file_name))
+        pickle.dump(model, open(full_brain_file_name, 'wb'))
+        print("Saving Done")
 
-            brain_name, brain_ext = os.path.splitext(brain_file_name)
-
-            eval_file_name = brain_name + ".eval"
-            eval_full_file_name = os.path.join(self.save_to_dir_name, eval_file_name)
-            print("Saving results of evaluation in %s" % (eval_full_file_name))
-            evaluator = Evaluator(player=self.hockey_problem.hockey_world.attack[0],
-                                  load_from_full_file_name=full_brain_file_name,
-                                  total_number_of_actions=len(self.hockey_problem.possible_actions), steps_in_height=1, steps_in_widht=1)
-            # mean_value, std_value = evaluator.quality_when_looking_at_left()
-            # TODO: not result_matrix!!!!!!!
-            pd.DataFrame(evaluator.result_matrix).to_csv(eval_full_file_name, header=None, index=None)
-            # df = pd.read_csv(eval_file_name)
-            # TODO: finish
-            print("Evaluation of Brain Done")
-
+        eval_full_file_name = self.folder_manager.brain_eval_file_name(idx, full=True)
+        print("Saving results of evaluation in %s" % (eval_full_file_name))
+        evaluator = Evaluator(player=self.hockey_problem.hockey_world.attack[0],
+                              load_from_full_file_name=full_brain_file_name,
+                              total_number_of_actions=len(self.hockey_problem.possible_actions), steps_in_height=1,
+                              steps_in_widht=1)
+        # mean_value, std_value = evaluator.quality_when_looking_at_left()
+        # TODO: not result_matrix!!!!!!!
+        pd.DataFrame(evaluator.result_matrix).to_csv(eval_full_file_name, header=None, index=None)
+        # df = pd.read_csv(eval_file_name)
+        # TODO: finish
+        print("Evaluation of Brain Done")
 
         # steps, reward, seconds, model = xcs.test(algorithm, scenario=self.scenario) # algorithm=XCSAlgorithm,
         self.running = False
-
-    def __chose_brain_file_name(self) -> Tuple[str, str]:
-        BRAIN_FILENAME_TEMPLATE = "brain_episode_%d.bin"
-        newest_brain = self.__find_newest_brain_in_dir(self.load_from_dir_name)
-        if newest_brain is None:
-            new_brain_idx = 1
-        else:
-            numbers = re.findall(r'(\d+).bin', newest_brain)
-            assert len(numbers) == 1, "newest_brain = %s, but I find several numbers (%s)" % (newest_brain, numbers)
-            new_brain_idx = int(numbers[0]) + 1
-        brain_file_name = BRAIN_FILENAME_TEMPLATE % new_brain_idx
-        full_brain_file_name = os.path.join(self.save_to_dir_name, brain_file_name)
-        return brain_file_name, full_brain_file_name
-
-    def __chose_brain_file_name2(self) -> Tuple[str, str]:
-        BRAIN_FILENAME_TEMPLATE = "brain_episode_%d.bin"
-        num_brain_file = 1
-        brain_file_name = BRAIN_FILENAME_TEMPLATE % num_brain_file
-        full_brain_file_name = os.path.join(self.save_to_dir_name, brain_file_name)
-        print("[choose brain file name]...")
-        while os.path.exists(full_brain_file_name):
-            num_brain_file += 1
-            brain_file_name = BRAIN_FILENAME_TEMPLATE % num_brain_file
-            full_brain_file_name = os.path.join(self.save_to_dir_name, brain_file_name)
-        print("[choose brain file name] Chose '%s'..." % (full_brain_file_name))
-        return brain_file_name, full_brain_file_name
 
     def is_running(self) -> bool:
         return self.running
