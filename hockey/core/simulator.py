@@ -18,6 +18,7 @@ import logging
 from xcs.scenarios import ScenarioObserver
 import xcs.bitstrings
 
+from util.base import find_newest_file_in_dir
 import numpy as np
 from geometry.point import Point
 from geometry.vector import Vec2d
@@ -91,11 +92,7 @@ class ScenarioSimulator(Simulator):
         print("run_until_done -> DONE")
 
     def __find_newest_brain_in_dir(self, directory: str) -> Optional[str]:
-        full_path_wildcard = os.path.join(directory, '*.bin')
-        try:
-            return max(glob.iglob(full_path_wildcard), key=os.path.getctime)
-        except Exception:
-            return None
+        return find_newest_file_in_dir(directory, file_pattern='*.bin')
 
     def run(self):
         self.scenario = ScenarioObserver(self.hockey_problem)
