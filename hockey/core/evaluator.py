@@ -99,19 +99,19 @@ class Evaluator(object):
         self.widths_to_sample = list(range(0, world_width, 1))
         self.problem_name = ""
         self.actions_on_sensing = {}
-        self.result_matrix = None # np.ones((len(self.heights_to_sample), len(self.widths_to_sample))) * -1
         # optimal actions
         self.optimal_actions = {}
-        self.optimal_actions[look_at_right_and_away] = [HockeyAction.TURN_HARD_RIGHT]
-        self.optimal_actions[look_at_right_and_near] = [HockeyAction.TURN_HARD_RIGHT, HockeyAction.SKATE_MIN_SPEED]
-        self.optimal_actions[look_at_left_and_away] = [HockeyAction.TURN_HARD_LEFT]
-        self.optimal_actions[look_at_left_and_near] = [HockeyAction.TURN_HARD_LEFT, HockeyAction.SKATE_MIN_SPEED]
+        self.optimal_actions["look_at_right_and_away"] = (look_at_right_and_away, [HockeyAction.TURN_HARD_RIGHT])
+        self.optimal_actions["look_at_right_and_near"] = (look_at_right_and_near, [HockeyAction.TURN_HARD_RIGHT, HockeyAction.SKATE_MIN_SPEED])
+        self.optimal_actions["look_at_left_and_away"] = (look_at_left_and_away, [HockeyAction.TURN_HARD_LEFT])
+        self.optimal_actions["look_at_left_and_near"] = (look_at_left_and_near, [HockeyAction.TURN_HARD_LEFT, HockeyAction.SKATE_MIN_SPEED])
+        self.perf_matrixes = {}
         self.quality = self.update_quality() # based on how much the actions of this brain match the optimals.
 
 
-    def quality_performance(self) -> Tuple[float, float]:
-        assert self.result_matrix is not None
-        return (np.mean(self.result_matrix), np.std(self.result_matrix))
+    def quality_performance(self, result_matrix) -> Tuple[float, float]:
+        assert result_matrix is not None
+        return (np.mean(result_matrix), np.std(result_matrix))
 
 
     def warm_up(self, problem_name: str, pre_sense_fn: Callable[[Player], None], verbose: bool = False):
@@ -136,13 +136,13 @@ class Evaluator(object):
         #             print("Nothing here!!!!")
         print("[WARMING UP] DONE")
 
-    def update_matrices(self,
-                        warm_up: bool,
-                        pre_sense_fn: Callable[[Player], None],
-                        optimal_actions:List[HockeyAction],
-                        near_optimal_actions:List[HockeyAction],
-                        compare_with: Optional[Tuple[np.ndarray, np.ndarray]],
-                        verbose: bool): # -> Tuple[np.ndarray, np.ndarray]:
+    def __performance_matrix__(self,
+                               warm_up: bool,
+                               pre_sense_fn: Callable[[Player], None],
+                               optimal_actions:List[HockeyAction],
+                               near_optimal_actions:List[HockeyAction],
+                               compare_with: Optional[Tuple[np.ndarray, np.ndarray]],
+                               verbose: bool) -> np.ndarray:
         """
         bla
         Specific for:
@@ -161,15 +161,15 @@ class Evaluator(object):
             compare_with_values, compare_with_bitstrings = compare_with
         if (verbose):
             print("+++++++++++++++++++++++ self.model.algorithm.exploration_probability = %.2f" % (self.model.algorithm.exploration_probability))
-        self.result_matrix = np.ones((len(self.heights_to_sample), len(self.widths_to_sample))) * -1
+        result_matrix = np.ones((len(self.heights_to_sample), len(self.widths_to_sample))) * -1
         # bitstring_matrix = np.ones((len(heights_to_sample), len(widths_to_sample))) * -1
         bitstring_matrix = np.empty(shape=(len(self.heights_to_sample), len(self.widths_to_sample)), dtype=object)
         #
         self.sensing_matrix = np.ones((len(self.heights_to_sample), len(self.widths_to_sample))) * -1
         self.distance2optimal = np.ones((len(self.heights_to_sample), len(self.widths_to_sample))) * -1
-        # # self.result_matrix = np.random.random((len(heights_to_sample), len(widths_to_sample)))
+        # # result_matrix = np.random.random((len(heights_to_sample), len(widths_to_sample)))
         # distance_to_grab = 10
-        # self.result_matrix[0:distance_to_grab - 1, 0:distance_to_grab - 1] = 1 # I am "just a cote" of the puck, so action by default will be 'pick up'
+        # result_matrix[0:distance_to_grab - 1, 0:distance_to_grab - 1] = 1 # I am "just a cote" of the puck, so action by default will be 'pick up'
 
         self.actions_on_sensing = {}
         if (verbose):
@@ -179,7 +179,7 @@ class Evaluator(object):
                 print("sweeping height %d out of %d" % (h, self.world.HEIGHT_ICE))
                 # print("Puck position: %s" % (self.world.puck.pos))
             for w in self.widths_to_sample:
-                if self.result_matrix[h,w] == -1:
+                if result_matrix[h,w] == -1:
                     # place agent, apply actions pre-specified
                     self.world.space.place_agent(self.player, pos=Point(w, h))
                     pre_sense_fn(self.player)
@@ -227,7 +227,7 @@ class Evaluator(object):
                     if len(dict_as_list) > 0:
                         sorted_list = sorted(dict_as_list, key=lambda ssss: ssss[1].prediction, reverse=True)
                         best_action = sorted_list[0][0]
-                        # self.result_matrix[h, w] = hash(best_action)
+                        # result_matrix[h, w] = hash(best_action)
 
                         actions_proposed = self.actions_on_sensing.get(situation_sensed, [])
                         actions_proposed = \
@@ -236,14 +236,14 @@ class Evaluator(object):
                         new_actions_proposed = list(map(lambda t: t if t[0] != best_action else (t[0], t[1] + 1, t[2]), actions_proposed))
                         self.actions_on_sensing[situation_sensed] = new_actions_proposed
 
-                        self.result_matrix[h, w] = \
+                        result_matrix[h, w] = \
                             1 if (best_action in set(optimal_actions)) \
                                 else 0.5 if (best_action in set(near_optimal_actions)) \
                                 else 0
                         self.distance2optimal[h, w] = (1 if best_action in optimal_actions else -1) * \
                                                       action_sets[best_action].prediction_weight
                     else:
-                        self.result_matrix[h, w] = 0
+                        result_matrix[h, w] = 0
                         self.distance2optimal[h, w] = -0.99 # whatever. TODO?
 
                     # best_action = match_set.best_actions[0]
@@ -269,16 +269,16 @@ class Evaluator(object):
                     #     print("\t ****** number of BEST ACTIONS = %d, so deduction is %.2f" % (len(match_set.best_actions), deduction))
                     # probably_result_of_covering = (match_set._action_sets[best_action].prediction - self.model.algorithm.initial_prediction < 1e-5)
                     # optimals_in_bests = len(set(optimal_actions).intersection(set(match_set.best_actions))) > 0
-                    # self.result_matrix[h, w] = 1 if (best_action in set(optimal_actions)) else 0 # (1 - deduction) if optimals_in_bests else 0
+                    # result_matrix[h, w] = 1 if (best_action in set(optimal_actions)) else 0 # (1 - deduction) if optimals_in_bests else 0
 
-                    # self.result_matrix[h, w] = \
+                    # result_matrix[h, w] = \
                     #     0 if probably_result_of_covering \
                     #         else (1 if optimals_in_bests else 0.5)
-                    # self.result_matrix[h, w] = \
+                    # result_matrix[h, w] = \
                     #     0 if probably_result_of_covering \
                     #         else (1 - deduction if optimals_in_bests else 0.5)
-                    if (compare_with is not None) and (compare_with_values[h,w] != self.result_matrix[h,w]):
-                        print("At [%d,%d]: result differs! (now %.2f, before %.2f)" % (h, w, self.result_matrix[h,w], compare_with_values[h,w]))
+                    if (compare_with is not None) and (compare_with_values[h,w] != result_matrix[h,w]):
+                        print("At [%d,%d]: result differs! (now %.2f, before %.2f)" % (h, w, result_matrix[h,w], compare_with_values[h,w]))
                         situation_sensed_before = compare_with_bitstrings[h,w]
                         if situation_sensed == situation_sensed_before:
                             print("\t BUT sensing is the same (%s)!!!!" % (situation_sensed))
@@ -292,8 +292,7 @@ class Evaluator(object):
         if (verbose):
             print("DONE!!!")
         assert len(np.argwhere(self.distance2optimal == -1)) == 0
-        # self.distance2optimal /= np.amax(abs(self.distance2optimal))
-        # return (self.result_matrix, bitstring_matrix)
+        return result_matrix
 
     def quality_when_looking_back(self, verbose: bool = False) -> Tuple[float, float]:
         def look_back(p: Player):
@@ -302,7 +301,7 @@ class Evaluator(object):
             p.turn_left()
             p.turn_left()
 
-        self.update_matrices(
+        self.__performance_matrix__(
             warm_up=False,
             pre_sense_fn = look_back,
             optimal_actions=[HockeyAction.TURN_HARD_RIGHT, HockeyAction.TURN_HARD_LEFT],
@@ -311,21 +310,21 @@ class Evaluator(object):
             verbose = verbose)
         return self.quality_performance()
 
-
-    def update_quality(self, verbose: bool = False):
+    def update_quality(self, verbose: bool = False) -> Tuple[float, float]:
         self.quality = (0, 0)
-        for movement_fn, list_of_optimals in self.optimal_actions.items():
-            self.update_matrices(
+        self.perf_matrixes = {}
+        for action_description, (movement_fn, list_of_optimals) in self.optimal_actions.items():
+            perf_matrix = self.__performance_matrix__(
                 warm_up=False,
                 pre_sense_fn=movement_fn,
                 optimal_actions=list_of_optimals,
                 near_optimal_actions=[],
                 compare_with=None,
                 verbose=verbose)
-            # quality_wrapper = QualityWrapper(evaluator, brain_file_name)
-            # looking at puck
-            mean_value, std_value = self.quality_performance()
-            print("[going round a function] mean = %.2f, std-dev: %.2f" % (mean_value, std_value))
+            self.perf_matrixes[action_description] = perf_matrix
+            mean_value, std_value = self.quality_performance(perf_matrix)
+            if verbose:
+                print("[going round a function] mean = %.2f, std-dev: %.2f" % (mean_value, std_value))
             m, s = self.quality
             self.quality = (m + mean_value, s + std_value)
         m, s = self.quality
@@ -333,14 +332,14 @@ class Evaluator(object):
         return self.quality
 
     def quality_when_looking_at_right_and_away_from_puck(self, verbose: bool = False) -> Tuple[float, float]:
-        self.update_matrices(
+        perf_matrix = self.__performance_matrix__(
             warm_up=False,
             pre_sense_fn = look_at_right_and_away,
             optimal_actions=[HockeyAction.TURN_HARD_RIGHT],
             near_optimal_actions=[],
             compare_with=None,
             verbose = verbose)
-        return self.quality_performance()
+        return self.quality_performance(perf_matrix)
 
     def quality_when_looking_at_left(self, verbose: bool = False) -> Tuple[float, float]:
         def look_at_left(p: Player):
@@ -348,102 +347,31 @@ class Evaluator(object):
             p.align_with_puck()
             p.turn_left()
 
-        self.update_matrices(
+        perf_matrix = self.__performance_matrix__(
             warm_up=False,
             pre_sense_fn = look_at_left,
             optimal_actions=[HockeyAction.TURN_HARD_RIGHT],
             near_optimal_actions=[],
             compare_with=None,
             verbose = verbose)
-        return self.quality_performance()
+        return self.quality_performance(perf_matrix)
 
     def quality_when_looking_at_puck(self, verbose: bool = False) -> Tuple[float, float]:
         def look_at_puck(p: Player):
             p.speed = X_UNIT_VECTOR
             p.align_with_puck()
 
-        self.update_matrices(
+            perf_matrix = self.__performance_matrix__(
             warm_up=False,
             pre_sense_fn = look_at_puck,
             optimal_actions=[HockeyAction.SKATE_MIN_SPEED],
             near_optimal_actions=[],
             compare_with=None,
             verbose = verbose)
-        return self.quality_performance()
+        return self.quality_performance(perf_matrix)
 
 
 
-# class QualityWrapper(object):
-#
-#     def __init__(self, evaluator: Evaluator, brain_file_name: str):
-#         self.evaluator = evaluator
-#
-#     def __update_matrices__(self, evaluator: Evaluator, movement_fn, optimal_actions: List[HockeyAction],
-#                             near_optimal_actions: List[HockeyAction], verbose: bool):
-#         evaluator.update_matrices(pre_sense_fn=movement_fn,
-#                                   warm_up=False,
-#                                   optimal_actions=optimal_actions,
-#                                   near_optimal_actions=near_optimal_actions,
-#                                   compare_with=None, verbose=verbose)
-#
-#     def quality_when_looking_back(self, verbose: bool) -> Tuple[float, float]:
-#         def look_back(p: Player):
-#             p.speed = X_UNIT_VECTOR
-#             p.align_with_puck()
-#             p.turn_left()
-#             p.turn_left()
-#
-#         self.__update_matrices__(
-#             self.evaluator,
-#             movement_fn = look_back,
-#             optimal_actions=[HockeyAction.TURN_HARD_RIGHT, HockeyAction.TURN_HARD_LEFT],
-#             near_optimal_actions=[],
-#             verbose = verbose)
-#         return evaluator.quality_performance()
-#
-#     def quality_when_looking_at_right(self, verbose: bool) -> Tuple[float, float]:
-#         def look_at_right(p: Player):
-#             p.speed = X_UNIT_VECTOR
-#             p.align_with_puck()
-#             p.turn_right()
-#
-#         self.__update_matrices__(
-#             self.evaluator,
-#             movement_fn = look_at_right,
-#             optimal_actions=[HockeyAction.TURN_HARD_LEFT],
-#             near_optimal_actions=[],
-#             verbose = verbose)
-#         return evaluator.quality_performance()
-#
-#     def quality_when_looking_at_left(self, verbose: bool) -> Tuple[float, float]:
-#         # quick demo
-#         def look_at_left(p: Player):
-#             p.speed = X_UNIT_VECTOR
-#             p.align_with_puck()
-#             p.turn_left()
-#
-#         self.__update_matrices__(
-#             self.evaluator,
-#             movement_fn = look_at_left,
-#             optimal_actions=[HockeyAction.TURN_HARD_RIGHT],
-#             near_optimal_actions=[],
-#             verbose = verbose)
-#         return evaluator.quality_performance()
-#
-#     def quality_when_looking_at_puck(self, verbose: bool = False) -> Tuple[float, float]:
-#         # quick demo
-#         def look_at_puck(p: Player):
-#             p.speed = X_UNIT_VECTOR
-#             p.align_with_puck()
-#
-#         self.__update_matrices__(
-#             self.evaluator,
-#             movement_fn = look_at_puck,
-#             optimal_actions=[HockeyAction.SKATE_MIN_SPEED],
-#             near_optimal_actions=[],
-#             verbose = verbose)
-#         return evaluator.quality_performance()
-#
 import matplotlib.pyplot as plt
 import numpy as np
 from util.base import normalize_to
