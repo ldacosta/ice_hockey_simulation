@@ -1,7 +1,8 @@
 import random
-from typing import List
 import numpy as np
-
+import glob
+import os
+from typing import List, Optional
 
 # How many feet in 1 meter?
 FEET_IN_METER = 0.3048
@@ -12,6 +13,14 @@ INCHES_IN_FOOT = 12
 # g (m/s^2)
 GRAVITY_ACCELERATION = 9.81
 
+
+def find_newest_file_in_dir(directory: str, file_pattern: str) -> Optional[str]:
+    """Returns newest file in directory that matches a pattern."""
+    full_path_wildcard = os.path.join(directory, file_pattern)
+    try:
+        return max(glob.iglob(full_path_wildcard), key=os.path.getctime)
+    except Exception:
+        return None
 
 def normalize_to(a_value: float, new_min: float, new_max: float, old_min: float, old_max: float) -> float:
     OldRange = (old_max - old_min)

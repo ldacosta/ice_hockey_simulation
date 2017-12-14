@@ -58,6 +58,9 @@ class EnvironmentState(CoreEnvironmentState):
             """Returns a bit representation of this distance, with usual semantics (repr[i] is bit i)"""
             return self.__int_to_bits__(an_int=int(round(speed_in_ft_per_sec)), how_many_bits=6)
 
+        self.vector2puck_opt = self.me.vector_me_to_puck_opt()
+        self.vector2puck_x_bits_opt = None if self.vector2puck_opt is None else __bits_distance_to_puck__(abs(self.vector2puck_opt.x))
+        self.vector2puck_y_bits_opt = None if self.vector2puck_opt is None else __bits_distance_to_puck__(abs(self.vector2puck_opt.y))
         self.distance2puck_opt = self.me.distance_to_puck_opt()
         self.distance2puck_bits_opt = __bits_distance_to_puck__(self.distance2puck_opt)
         self.angle2puck_opt = self.me.angle_to_puck_opt()
@@ -124,6 +127,77 @@ class EnvironmentState(CoreEnvironmentState):
 
     def bit_7_distance_to_puck(self) -> int:
         return self.__bit_i_distance_to_puck__(7)
+
+    def __bit_i_x_vector_to_puck__(self, i: int) -> int:
+        bits = self.vector2puck_x_bits_opt
+        if bits is None:
+            return 0
+        else:
+            return int(bits[i])
+
+    def bit_sign_x_vector_to_puck(self) -> int:
+        return 1 if self.vector2puck_opt is not None and self.vector2puck_opt.x > 0 else 0
+
+    def bit_sign_y_vector_to_puck(self) -> int:
+        return 1 if self.vector2puck_opt is not None and self.vector2puck_opt.y > 0 else 0
+
+    def bit_0_x_vector_to_puck(self) -> int:
+        return self.__bit_i_x_vector_to_puck__(0)
+
+    def bit_1_x_vector_to_puck(self) -> int:
+        return self.__bit_i_x_vector_to_puck__(1)
+
+    def bit_2_x_vector_to_puck(self) -> int:
+        return self.__bit_i_x_vector_to_puck__(2)
+
+    def bit_3_x_vector_to_puck(self) -> int:
+        return self.__bit_i_x_vector_to_puck__(3)
+
+    def bit_4_x_vector_to_puck(self) -> int:
+        return self.__bit_i_x_vector_to_puck__(4)
+
+    def bit_5_x_vector_to_puck(self) -> int:
+        return self.__bit_i_x_vector_to_puck__(5)
+
+    def bit_6_x_vector_to_puck(self) -> int:
+        return self.__bit_i_x_vector_to_puck__(6)
+
+    def bit_7_x_vector_to_puck(self) -> int:
+        return self.__bit_i_x_vector_to_puck__(7)
+
+    def __bit_i_y_vector_to_puck__(self, i: int) -> int:
+        bits = self.vector2puck_y_bits_opt
+        if bits is None:
+            return 0
+        else:
+            return int(bits[i])
+
+    def bit_0_y_vector_to_puck(self) -> int:
+        return self.__bit_i_y_vector_to_puck__(0)
+
+    def bit_1_y_vector_to_puck(self) -> int:
+        return self.__bit_i_y_vector_to_puck__(1)
+
+    def bit_2_y_vector_to_puck(self) -> int:
+        return self.__bit_i_y_vector_to_puck__(2)
+
+    def bit_3_y_vector_to_puck(self) -> int:
+        return self.__bit_i_y_vector_to_puck__(3)
+
+    def bit_4_y_vector_to_puck(self) -> int:
+        return self.__bit_i_y_vector_to_puck__(4)
+
+    def bit_5_y_vector_to_puck(self) -> int:
+        return self.__bit_i_y_vector_to_puck__(5)
+
+    def bit_6_y_vector_to_puck(self) -> int:
+        return self.__bit_i_y_vector_to_puck__(6)
+
+    def bit_7_y_vector_to_puck(self) -> int:
+        return self.__bit_i_y_vector_to_puck__(7)
+
+
+
 
     def __puck_closer_than__(self, n_feet: float) -> bool:
         dist_to_puck_opt = self.me.distance_to_puck_opt()

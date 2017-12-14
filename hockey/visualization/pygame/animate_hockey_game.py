@@ -1,21 +1,25 @@
-
-import sys, getopt
+import getopt
 import os
-import pygame
-import pandas as pd
+import sys
 import time
 
+import pandas as pd
+import pygame
 from geometry.point import Point
 from geometry.vector import Vec2d
-from hockey.core.model import TIME_PER_FRAME
-from hockey.behaviour.core.hockey_scenario import GrabThePuckProblem
-from hockey.core.simulator import MesaModelSimulator, ScenarioSimulator
-from hockey.core.half_rink import HockeyHalfRink
-from hockey.visualization.pygame.half_rink import HalfRinklPygameRenderable
 from pygame.color import THECOLORS
-
 from rendering.pygame.base import pygame_render
+from typing import Optional
+
+from hockey.behaviour.core.hockey_scenario import GrabThePuckProblem
+from hockey.core.folder_manager import FolderManager
+from hockey.core.half_rink import HockeyHalfRink
+from hockey.core.model import TIME_PER_FRAME
+from hockey.core.simulator import MesaModelSimulator, ScenarioSimulator
 from hockey.visualization.pygame.global_def import HALF_ICE_WIDTH, HALF_ICE_HEIGHT
+from hockey.visualization.pygame.half_rink import HalfRinklPygameRenderable
+from util.base import find_newest_file_in_dir
+
 
 def read_and_merge_dataframes(input_directory, prefix_fname: str, verbose: bool = False) -> pd.DataFrame:
     all_fnames = [os.path.join(input_directory, fname)
@@ -24,10 +28,16 @@ def read_and_merge_dataframes(input_directory, prefix_fname: str, verbose: bool 
         print("From '%s' I read %s" % (input_directory, all_fnames))
     return pd.concat(list(map(pd.read_csv, all_fnames)), ignore_index=True)
 
+
+def newest_brain_in_dir(directory: str) -> Optional[str]:
+    """Gets newest brain in a folder - None is there is nothing there or the directory doesn't exist."""
+    return find_newest_file_in_dir(directory, file_pattern='*.bin')
+
+
 def main(argv):
     def show_options():
         print("To run experience, do:")
-        print("> animate_hockey_game.py -s <save_every_seconds> -r <record_in_minutes> -b <brain_file> -o <output_file_name>")
+        print("> animate_hockey_game.py -d <experiments_root_dir> -e <experiment_name> -s <save_every_seconds> -r <record_in_minutes>")
         print("if <save_every_seconds> == -1 => 'record ALL steps of simulation' (warning: memory is cheap, not infinite)")
         #
         print("To display results of experience, do:")
@@ -35,15 +45,25 @@ def main(argv):
     #
     DATA_EVERY_SECS = float("inf")
     RECORD_THIS_MANY_MINUTES = 0
-    output_directory = ""
     input_directory = ""
-    brain_file_name = ""
     speedup = 0
+    experiment_name = None
+    all_experiments_root_dir = None
     try:
-      opts, args = getopt.getopt(argv,"hs:r:i:o:a:b:",["save_every_seconds=","record_in_minutes=","input_directory=","output_directory=","acceleration=","brain_file="])
+      opts, args = getopt.getopt(argv,
+                                 "hs:r:i:a:d:e:",
+                                 ["save_every_seconds=",
+                                  "record_in_minutes=",
+                                  "input_directory=",
+                                  "acceleration=",
+                                  "experiments_root_dir=",
+                                  "experiment_name=",
+                                  ]
+                                 )
     except getopt.GetoptError:
-       show_options()
-       sys.exit(2)
+        print("Your command line contains options that are invalid.")
+        show_options()
+        sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
             show_options()
@@ -52,20 +72,25 @@ def main(argv):
             DATA_EVERY_SECS = float(arg)
         elif opt in ("-r", "--record_in_minutes"):
             RECORD_THIS_MANY_MINUTES = int(arg)
-        elif opt in ("-o", "--output_directory"):
-            output_directory = str(arg)
         elif opt in ("-i", "--input_directory"):
             input_directory = str(arg)
         elif opt in ("-a", "--acceleration"):
             speedup = float(arg)
-        elif opt in ("-b", "--brain_file"):
-            brain_file_name = str(arg)
+        elif opt in ("-d", "--experiments_root_dir="):
+            all_experiments_root_dir = str(arg)
+        elif opt in ("-e", "--experiment_name="):
+            experiment_name = str(arg)
         else:
             print("Unrecognized option %s" % (opt))
     #
     if (DATA_EVERY_SECS != float("inf") and (speedup != 0)) or (DATA_EVERY_SECS == float("inf") and (speedup == 0)):
         show_options()
-        raise RuntimeError("Either you generate data (by specifying -s and its companions) or you display data (by setting -d). You can't do both")
+        raise RuntimeError("Either you generate data (by specifying -s and its companions) or you display data (by setting -d). You can't do both") # TODO: revise this message
+    if (all_experiments_root_dir is None) or (experiment_name is None):
+        show_options()
+        raise RuntimeError("Both the root of the experiments and the experiment name has to be specified.")
+    folder_manager = FolderManager(experiments_root_dir=all_experiments_root_dir, experiment_name=experiment_name)
+
     mode_simulation = DATA_EVERY_SECS != float("inf") # otherwise in mode visualization
     mode_visualization = not mode_simulation
     if mode_simulation:
@@ -78,12 +103,6 @@ def main(argv):
         if RECORD_THIS_MANY_MINUTES <= 0:
             show_options()
             raise RuntimeError("[record this many minutes] parameter must be > 0 (currently %.2f)" % (RECORD_THIS_MANY_MINUTES))
-        if output_directory == "":
-            show_options()
-            raise RuntimeError("[mode = simulation] output directory must be specified")
-        if brain_file_name == "":
-            show_options()
-            raise RuntimeError("[mode = simulation] brain file must be specified")
     if mode_visualization:
         if input_directory == "":
             raise RuntimeError("[mode = visualization] input directory must be specified")
@@ -91,15 +110,21 @@ def main(argv):
             raise RuntimeError("[mode = visualization] input directory must be specified")
 
     # field
-    hockey_rink = HockeyHalfRink(how_many_offense=1, how_many_defense=0, one_step_in_seconds=TIME_PER_FRAME, collect_data_every_secs=DATA_EVERY_SECS, record_this_many_minutes=RECORD_THIS_MANY_MINUTES)
+    hockey_rink = HockeyHalfRink(
+        width=HockeyHalfRink.WIDTH_HALF_ICE,
+        height=HockeyHalfRink.HEIGHT_ICE,
+        how_many_offense=1,
+        how_many_defense=0,
+        one_step_in_seconds=TIME_PER_FRAME,
+        collect_data_every_secs=DATA_EVERY_SECS,
+        record_this_many_minutes=RECORD_THIS_MANY_MINUTES)
     if mode_simulation:
-        os.makedirs(output_directory, exist_ok=True)
+        folder_manager.makedirs()
         # let's choose the name of the files were the data will be saved:
         # model
         print("************************** Choosing file name where to save model...")
         num_model_file = 1
-        model_file_name = "model_%d.pd" % num_model_file
-        full_model_file_name = os.path.join(output_directory, model_file_name)
+        full_model_file_name = folder_manager.model_file_name(run_number=num_model_file, full=True)
         print("Trying '%s'..." % (full_model_file_name))
         # max_tick = 0
         max_step = 0
@@ -118,52 +143,32 @@ def main(argv):
             print("Updating max_steps to %d, max_goals to %d, max_shots to %d, max_timestamp to %.2f" % (max_step, max_goals, max_shots, max_timestamp))
             # new file to search
             num_model_file += 1
-            model_file_name = "model_%d.pd" % num_model_file
-            full_model_file_name = os.path.join(output_directory, model_file_name)
+            full_model_file_name = folder_manager.model_file_name(run_number=num_model_file, full=True)
             print("Trying '%s'..." % (full_model_file_name))
         print("[Model file] Chosen '%s'" % (full_model_file_name))
         # agents
         print("************************** Choosing file name where to save agents...")
         num_agents_file = 1
-        agents_file_name = "agents_%d.pd" % num_agents_file
-        full_agents_file_name = os.path.join(output_directory, agents_file_name)
+        full_agents_file_name = folder_manager.agents_file_name(run_number=num_agents_file, full=True)
         print("Trying '%s'..." % (full_agents_file_name))
         while os.path.exists(full_agents_file_name):
             num_agents_file += 1
-            agents_file_name = "agents_%d.pd" % num_agents_file
-            full_agents_file_name = os.path.join(output_directory, agents_file_name)
+            full_agents_file_name = folder_manager.agents_file_name(run_number=num_agents_file, full=True)
             print("Trying '%s'..." % (full_agents_file_name))
         print("[Agents file] Chosen '%s'\n" % (full_agents_file_name))
-        print("Will record %d minutes of simulated action, snapshots every %.2f seconds; will then save output in %s"
-              % (RECORD_THIS_MANY_MINUTES, DATA_EVERY_SECS, output_directory))
+        print("Will record %d minutes of simulated action, snapshots every %.2f seconds; reporting will be done in these dirs:\n%s"
+              % (RECORD_THIS_MANY_MINUTES, DATA_EVERY_SECS, folder_manager.directories2str()))
         mesa_simulator = MesaModelSimulator(mesa_model=hockey_rink)
         hockey_problem = GrabThePuckProblem(hockey_world=hockey_rink)
 
         # where am I going to save to?
-        brain_dir, brain_name = os.path.split(brain_file_name)
-        # if len(brain_name) == 0:
-        #     raise RuntimeError("Brain file specified as '%s', so it looks like you forgot the actual file name" % (brain_file_name))
-        if len(brain_dir) > 0:
-            print("[brain file name] Checking that directory '%s' is OK" % (brain_dir))
-            os.makedirs(brain_dir, exist_ok=True)
-        save_brain_to = brain_file_name
-        print("OK, will save resulting brain to '%s'" % (save_brain_to))
-        # where am I going to read from?
-        load_brain_from = brain_file_name
-        # if os.path.isfile(brain_file_name):
-        #     load_brain_from = brain_file_name
-        #     print("Will read existing brain from '%s'" % (load_brain_from))
-        # else:
-        #     load_brain_from = None
-        #     print("WIll not read the brain from anywhere")
+        brain_dir = folder_manager.brain_dir
+        brain_name_opt = newest_brain_in_dir(brain_dir)
 
         # xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name="my_model_1.bin", save_to_file_name=None)
         # xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name="my_model_1.bin",
         #                                   save_to_file_name="my_model_1.bin")
-        xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem,
-                                          load_from_dir_name=brain_dir,
-                                          load_from_file_name=None if len(brain_name) == 0 else brain_name,
-                                          save_to_dir_name=brain_dir)
+        xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, folder_manager=folder_manager)
         # xcs_simulator = ScenarioSimulator(xcs_scenario=hockey_problem, load_from_file_name="my_model_1_2.bin", save_to_file_name="my_model_1_2.bin")
         # mesa_simulator.run()
 

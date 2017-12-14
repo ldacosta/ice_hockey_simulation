@@ -9,6 +9,7 @@ from geometry.point import Point
 from geometry.vector import Vec2d
 from hockey.core.model import TIME_PER_FRAME
 from util.base import FEET_IN_METER, GRAVITY_ACCELERATION
+from util.geometry.container import Container
 
 class ObjectOnIce(Agent):
     """Anything that goes on ice follows this behaviour."""
@@ -24,10 +25,43 @@ class ObjectOnIce(Agent):
         else:
             self.pos = pos_opt
         if (speed_opt is None):
-            self.speed = Vec2d(0, 0)
+            self._speed = Vec2d(0, 0)
         else:
-            self.speed = speed_opt
+            self._speed = speed_opt
         self.size = size
+        if self.model.is_continuous():
+            self.container = Container(height=self.model.height - 0.01, width=self.model.width - 0.01)
+        else:
+            self.container = Container(height=self.model.height - 1, width=self.model.width - 1)
+
+    @property
+    def speed(self) -> Vec2d:
+        """I'm the 'x' property."""
+        # print("getter of x called")
+        return self._speed
+
+    @speed.setter
+    def speed(self, value: Vec2d):
+        # print("setter of x called")
+        if not self.model.is_continuous():
+            speed_on_x = value.x
+            if abs(round(speed_on_x) - speed_on_x) > 1e-5:
+                raise RuntimeError("WARNING ===> setting of %s's speed to %s, which gives a non-integer 'x' speed (~ %.2f)" %
+                      (self.unique_id, value, speed_on_x))
+            speed_on_y =value.y
+            if abs(round(speed_on_y) - speed_on_y) > 1e-5:
+                raise RuntimeError("WARNING ===> setting of %s's speed to %s, which gives a non-integer 'y' speed (~ %.2f)" %
+                      (self.unique_id, value, speed_on_y))
+        else:
+            print("[CONTINUOUS WORLD[ [%s] set speed to %s" %
+                  (self.unique_id, value))
+        self._speed = value
+
+    @speed.deleter
+    def speed(self):
+        # print("deleter of x called")
+        del self._speed
+
 
     def is_moving(self) -> bool:
         return not self.speed.is_zero()
@@ -36,7 +70,37 @@ class ObjectOnIce(Agent):
         """Is this agent behind the goal line?"""
         return self.pos.x > self.model.GOALIE_X
 
-    def move_by_bouncing_from_walls(self, prob_of_score_on_goal_opt: Optional[float] = None, friction_constant_opt: Optional[float] = None):
+    def move_by_bouncing_from_walls(self, for_how_long: float, prob_of_score_on_goal_opt: Optional[float] = None, friction_constant_opt: Optional[float] = None):
+        """
+        Moves around the ice, bouncing from walls and from the goal.
+        Args:
+            prob_of_score_on_goal: probability of score a goal if it comes to the front of the goal.
+
+        Returns:
+
+        """
+        new_pt, new_speed = self.container.particle_move(
+            for_how_long=for_how_long,
+            particle_diameter=0, # TODO: 0??????? whaaaa?? Isn't it self.size,
+            particle_pos=self.pos,
+            particle_speed_vector=self.speed,
+            friction_constant_opt=friction_constant_opt)
+
+        # TODO: interacting with goal!
+
+        # If you need debugging info, un-comment this:
+        # print("[%s] current: pos => (%f,%f), speed => (%f,%f); in %f seconds, moving to: pos => (%f,%f), new speed => (%f,%f)" %
+        #       (self.unique_id, self.pos[0], self.pos[1], self.speed[0], self.speed[1], TIME_PER_FRAME, new_x, new_y, new_speed_x, new_speed_y))
+        try:
+            self.model.move_agent(self, new_pt)
+            # self.model.space.move_agent(self, new_pt)
+        except Exception as e:
+            print("[%s] translating %s to %s =>  trying to go to %s" % (self.unique_id, self.pos, self.speed, new_pt))
+            raise e
+        self.speed = new_speed
+
+
+    def move_by_bouncing_from_walls_ORIG(self, prob_of_score_on_goal_opt: Optional[float] = None, friction_constant_opt: Optional[float] = None):
         """
         Moves around the ice, bouncing from walls and from the goal.
         Args:
@@ -123,7 +187,8 @@ class ObjectOnIce(Agent):
         # print("[%s] current: pos => (%f,%f), speed => (%f,%f); in %f seconds, moving to: pos => (%f,%f), new speed => (%f,%f)" %
         #       (self.unique_id, self.pos[0], self.pos[1], self.speed[0], self.speed[1], TIME_PER_FRAME, new_x, new_y, new_speed_x, new_speed_y))
         try:
-            self.model.space.move_agent(self, Point(new_x, new_y))
+            self.model.move_agent(self, Point(new_x, new_y))
+            # self.model.space.move_agent(self, Point(new_x, new_y))
         except Exception as e:
             print("hello")
             raise e

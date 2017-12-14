@@ -8,7 +8,7 @@ TODO:
 """
 import unittest
 from random import random
-from util.base import choose_by_roulette, choose_first_option_by_roulette, random_between
+from util.base import choose_by_roulette, choose_first_option_by_roulette, random_between, find_newest_file_in_dir
 
 class TestUtilities(unittest.TestCase):
     """Testing definitions."""
@@ -43,6 +43,11 @@ class TestUtilities(unittest.TestCase):
             the_max = max(a, b)
             in_between = random_between(the_min, the_max)
             assert (in_between >= the_min) and (in_between <= the_max)
+
+    def test_newest_file(self):
+        """Getting the newest file from a directory behaves like so:"""
+        self.assertIsNone(find_newest_file_in_dir(directory="thisdoesntexist", file_pattern="*"))
+
 
 
 

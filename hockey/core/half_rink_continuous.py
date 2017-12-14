@@ -7,7 +7,7 @@ import random
 
 from mesa import Model
 from mesa.datacollection import DataCollector
-from mesa.space import ContinuousSpace, MultiGrid
+from mesa.space import ContinuousSpace
 from mesa.time import RandomActivation
 from geometry.point import Point
 from geometry.vector import Vec2d
@@ -19,17 +19,16 @@ from hockey.core.puck import Puck
 from typing import Optional, Tuple
 
 from hockey.behaviour.core.rule_based_brain import RuleBasedBrain
-from hockey.core.object_on_ice import ObjectOnIce
 from hockey.core.player.base import Player
 from hockey.core.player.defense import Defense
 from hockey.core.player.forward import Forward
 from hockey.core.model import TIME_PER_FRAME
 
-class HockeyHalfRink(Model):
+class HockeyHalfRinkContinuous(Model):
     """The attacking side of a Hockey Rink."""
 
-    WIDTH_HALF_ICE = 5 # 100 # TODO!
-    HEIGHT_ICE = 5 # 85 # TODO!
+    WIDTH_HALF_ICE = 3 # 10 # 100 # TODO!
+    HEIGHT_ICE = 3 # 10 # 85 # TODO!
     GOALIE_X = WIDTH_HALF_ICE - 11
     GOALIE_WIDTH = 6
     GOALIE_Y_BOTTOM = HEIGHT_ICE / 2 - GOALIE_WIDTH / 2
@@ -47,48 +46,7 @@ class HockeyHalfRink(Model):
         """Returns a random position inside of the half-ice."""
         return Point(random.random() * self.width, random.random() * self.height)
 
-    def move_agent(self, an_agent: ObjectOnIce, new_pt: Point):
-        """
-        Moves the agent depending on where we live.
-        Args:
-            an_agent: 
-            new_pt: 
-
-        Returns:
-            Nothing.
-
-        """
-        # TODO: this is horribly inefficient, but it provides the flexibility of switching between discrete and continuous spaces.
-        # if we are on a continuous space I can move to the real place. Otherwise I have to "cast" to a integer space.
-        if self.is_continuous():
-            self.space.move_agent(an_agent, new_pt)
-        else:
-            new_pt.integerize()
-            self.space.move_agent(an_agent, new_pt) # stupid non-functional Python
-
-
-    def is_continuous(self) -> bool:
-        return isinstance(self.space, ContinuousSpace)
-
-    def __init__(self,
-                 width: int,
-                 height: int,
-                 how_many_defense: int,
-                 how_many_offense: int,
-                 one_step_in_seconds: float,
-                 collect_data_every_secs: float,
-                 record_this_many_minutes: int):
-        """
-        
-        Args:
-            width: how many divisions on X
-            height: how many divisions on Y
-            how_many_defense: 
-            how_many_offense: 
-            one_step_in_seconds: 
-            collect_data_every_secs: 
-            record_this_many_minutes: 
-        """
+    def __init__(self, how_many_defense: int, how_many_offense: int, one_step_in_seconds: float, collect_data_every_secs: float, record_this_many_minutes: int):
         assert one_step_in_seconds > 0 and how_many_defense >= 0 and how_many_offense >= 0
         Model.__init__(self)
         self.HOW_MANY_MINUTES_TO_RECORD = record_this_many_minutes
@@ -96,12 +54,12 @@ class HockeyHalfRink(Model):
         self.one_step_in_seconds = one_step_in_seconds
         # every how many steps do I have to collect data:
         self.collect_every_steps = (1 / self.one_step_in_seconds) * collect_data_every_secs
-        self.height = height
-        self.width = width
+        self.height = HockeyHalfRink.HEIGHT_ICE
+        self.width = HockeyHalfRink.WIDTH_HALF_ICE
         self.schedule = RandomActivation(self)
         # if this was a Grid, the attribute would be called 'self.grid'
         # But because it is continuous, it is called 'self.space'
-        self.space = MultiGrid(width=self.width, height=self.height, torus=False)
+        self.space = ContinuousSpace(x_max=self.width, y_max=self.height, torus=False)
         # data collector
         self.datacollector = DataCollector(
             model_reporters={
@@ -175,12 +133,12 @@ class HockeyHalfRink(Model):
         """Sets the players positions as at the beginning of an iteration."""
 
         self.space.place_agent(self.puck, pos = Point(0,0))
-        [defense_player.reset(to_speed=Player.VERY_LOW_SPEED) for defense_player in self.defense]
-        [attack_player.reset(to_speed=Player.VERY_LOW_SPEED) for attack_player in self.attack]
+        [defense_player.reset(to_speed=0.01) for defense_player in self.defense]
+        [attack_player.reset(to_speed=0.01) for attack_player in self.attack]
         p_player = Point(HockeyHalfRink.WIDTH_HALF_ICE - 1,HockeyHalfRink.HEIGHT_ICE - 1)
         [self.space.place_agent(defense_player, pos = p_player) for defense_player in self.defense]
         [self.space.place_agent(attacker, pos = p_player) for attacker in self.attack]
-        # TODO: _this_ is really 'random': (have to put it back)
+        # TODO: _this_ is really 'random': (have to puck it back)
         # self.space.place_agent(self.puck, pos = self.get_random_position())
         # [self.space.place_agent(defense_player, pos = self.get_random_position()) for defense_player in self.defense]
         # [self.space.place_agent(attacker, pos = self.get_random_position()) for attacker in self.attack]
