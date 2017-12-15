@@ -9,6 +9,7 @@ from geometry.vector import Vec2d
 from mesa.datacollection import DataCollector
 from typing import Optional, Tuple
 
+from hockey.core.folder_manager import FolderManager
 from hockey.behaviour.core.rule_based_brain import RuleBasedBrain
 from hockey.core.ice_surface.ice_rink import SkatingIce
 from hockey.core.player.defense import Defense
@@ -96,6 +97,38 @@ class HockeyHalfRink(SkatingIce):
         result += "\n"
         return result
 
+    def save_activity(self, folder_manager: FolderManager):
+        latest_model_file = folder_manager.newest_model_file()
+        # max_tick = 0
+        max_step = 0
+        max_goals = 0
+        max_shots = 0
+        max_timestamp = 0
+        if (latest_model_file is not None) and os.path.exists(latest_model_file):
+            # update max's
+            model_df = pd.read_csv(latest_model_file)
+            # max_tick = max(max_tick, model_df["Unnamed: 0"].max())
+            max_step = model_df["steps"].max()
+            max_goals = model_df["goals"].max()
+            max_shots = model_df["shots"].max()
+            max_timestamp = model_df["timestamp"].max()
+            print("Updating max_steps to %d, max_goals to %d, max_shots to %d, max_timestamp to %.2f" % (max_step, max_goals, max_shots, max_timestamp))
+        _, full_model_file_name = folder_manager.suggest_model_file_name()
+        print("[Model file] Chosen '%s'" % (full_model_file_name))
+        # agents
+        _, full_agents_file_name = folder_manager.suggest_agents_file_name()
+        print("[Agents file] Chosen '%s'\n" % (full_agents_file_name))
+        # update data
+        model_df = self.datacollector.get_model_vars_dataframe()
+        model_df["goals"] += max_goals
+        model_df["shots"] += max_shots
+        model_df["steps"] += max_step
+        model_df["timestamp"] += max_timestamp
+        agents_df = self.datacollector.get_agent_vars_dataframe()
+        agents_df["timestamp"] += max_timestamp
+        # ok, now save
+        model_df.to_csv(full_model_file_name)
+        agents_df.to_csv(full_agents_file_name)
     def prob_of_scoring_from_distance(self, distance_to_goal: float) -> float:
         # based on http://www.omha.net/news_article/show/667329-the-science-of-scoring
         if distance_to_goal <= 10:
