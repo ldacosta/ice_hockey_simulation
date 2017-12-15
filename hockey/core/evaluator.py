@@ -54,7 +54,7 @@ class Evaluator(object):
         self.player = player
         self.world = self.player.model
         last_modified_str = time.ctime(os.stat(self.load_from).st_mtime)
-        print("Loading model from file '%s' (last modified on %s)..." % (self.load_from, last_modified_str))
+        print("[Evaluator] Loading model from file '%s' (last modified on %s)..." % (self.load_from, last_modified_str))
         self.model = None
         with open(self.load_from, 'rb') as f:
             self.model = pickle.load(f)
