@@ -1,7 +1,7 @@
 import os
 import glob
 import re
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, Callable
 from util.base import find_newest_file_in_dir
 
 class FolderManager(object):
@@ -60,6 +60,32 @@ class FolderManager(object):
             new_brain_idx = int(numbers[0]) + 1
         return new_brain_idx, self.brain_file_name(episode=new_brain_idx, full=True)
 
+    def newest_model_file(self) -> Optional[str]:
+        """Gets newest model's file in a folder - None is there is nothing there or the directory doesn't exist."""
+        return find_newest_file_in_dir(self.model_dir, file_pattern='*.pd')
 
+    def suggest_model_file_name(self) -> Tuple[int, str]:
+        newest_model = self.newest_model_file()
+        if newest_model is None:
+            new_model_idx = 1
+        else:
+            numbers = re.findall(r'(\d+).pd', newest_model)
+            assert len(numbers) == 1, "newest_model = %s, but I find several numbers (%s)" % (newest_model, numbers)
+            new_model_idx = int(numbers[0]) + 1
+        return new_model_idx, self.model_file_name(run_number=new_model_idx, full=True)
+
+    def newest_agents_file(self) -> Optional[str]:
+        """Gets newest agents' file in a folder - None is there is nothing there or the directory doesn't exist."""
+        return find_newest_file_in_dir(self.model_dir, file_pattern='*.pd')
+
+    def suggest_agents_file_name(self) -> Tuple[int, str]:
+        newest = self.newest_agents_file()
+        if newest is None:
+            new_idx = 1
+        else:
+            numbers = re.findall(r'(\d+).pd', newest)
+            assert len(numbers) == 1, "newest = %s, but I find several numbers (%s)" % (newest, numbers)
+            new_idx = int(numbers[0]) + 1
+        return new_idx, self.agents_file_name(run_number=new_idx, full=True)
 
 
