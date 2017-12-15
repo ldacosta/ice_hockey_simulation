@@ -5,6 +5,8 @@
 
 
 import random
+import os
+import pandas as pd
 
 from mesa import Model
 from mesa.datacollection import DataCollector
@@ -18,6 +20,7 @@ from util.base import choose_first_option_by_roulette
 from hockey.core.puck import Puck
 from typing import Optional
 
+from hockey.core.folder_manager import FolderManager
 from hockey.behaviour.core.rule_based_brain import RuleBasedBrain
 from hockey.core.object_on_ice import ObjectOnIce
 from hockey.core.player.base import Player
@@ -71,8 +74,6 @@ class SkatingIce(Model):
                 "steps": lambda m: m.schedule.steps,
                 "timestamp": lambda m: m.schedule.steps * m.one_step_in_seconds,
                 "puck_is_taken": lambda m: m.puck.is_taken,
-                "goals": lambda m: m.goals_scored,
-                "shots": lambda m: m.shots,
             },
             agent_reporters={
                 "timestamp": lambda agent: agent.model.schedule.steps * agent.model.one_step_in_seconds,
@@ -84,8 +85,7 @@ class SkatingIce(Model):
                 "topuck_x": lambda agent: agent.model.vector_to_puck(a_pos=agent.pos).x if type(agent) != Puck else "",
                 "topuck_y": lambda agent: agent.model.vector_to_puck(a_pos=agent.pos).y if type(agent) != Puck else "",
                 "angle2puck": lambda agent: agent.model.angle_to_puck(a_pos=agent.pos,
-                                                                      looking_at=agent.vector_looking_at()) if type(
-                    agent) != Puck else "",
+                                                                      looking_at=agent.vector_looking_at()) if type(agent) != Puck else "",
                 "last_action": lambda agent: agent.last_action if type(agent) != Puck else "",
                 "have_puck": lambda agent: agent.have_puck if type(agent) != Puck else "",
                 "can_see_puck": lambda agent: agent.can_see_puck() if type(agent) != Puck else "",
@@ -110,6 +110,33 @@ class SkatingIce(Model):
         self.collect_every_steps = None # every how many steps do I have to collect data
         self.reset()
 
+    def save_activity(self, folder_manager: FolderManager):
+        latest_model_file = folder_manager.newest_model_file()
+        # max_tick = 0
+        max_step = 0
+        max_timestamp = 0
+        if (latest_model_file is not None) and os.path.exists(latest_model_file):
+            # update max's
+            model_df = pd.read_csv(latest_model_file)
+            # max_tick = max(max_tick, model_df["Unnamed: 0"].max())
+            max_step = model_df["steps"].max()
+            max_timestamp = model_df["timestamp"].max()
+            print("Updating max_steps to %d, max_timestamp to %.2f" % (max_step, max_timestamp))
+        _, full_model_file_name = folder_manager.suggest_model_file_name()
+        print("[Model file] Chosen '%s'" % (full_model_file_name))
+        # agents
+        _, full_agents_file_name = folder_manager.suggest_agents_file_name()
+        print("[Agents file] Chosen '%s'\n" % (full_agents_file_name))
+        # update data
+        model_df = self.datacollector.get_model_vars_dataframe()
+        model_df["steps"] += max_step
+        model_df["timestamp"] += max_timestamp
+        agents_df = self.datacollector.get_agent_vars_dataframe()
+        agents_df["timestamp"] += max_timestamp
+        # ok, now save
+        model_df.to_csv(full_model_file_name)
+        agents_df.to_csv(full_agents_file_name)
+
 
     def setup_run(self, one_step_in_seconds: float,
                  collect_data_every_secs: float,
@@ -118,6 +145,7 @@ class SkatingIce(Model):
         self.HOW_MANY_MINUTES_TO_RECORD = record_this_many_minutes
         self.one_step_in_seconds = one_step_in_seconds
         self.collect_every_steps = (1 / self.one_step_in_seconds) * collect_data_every_secs
+        self.reset()
 
     def has_run_been_setup(self) -> bool:
         return (self.HOW_MANY_MINUTES_TO_RECORD is not None) and \
@@ -135,9 +163,6 @@ class SkatingIce(Model):
 
     def reset(self):
         self.reset_agents()
-        self.HOW_MANY_MINUTES_TO_RECORD = None
-        self.one_step_in_seconds = None
-        self.collect_every_steps = None # every how many steps do I have to collect data
 
     def reset_agents(self):
         """Sets the players positions as at the beginning of an iteration."""
@@ -211,13 +236,14 @@ class SkatingIce(Model):
         return not (self.who_has_the_puck() is None)
 
     def collect_data_if_is_time(self):
+        assert self.has_run_been_setup()
         # self.schedule.steps
-        num_data_collected = len(self.datacollector.model_vars['goals'])
+        num_data_collected = len(self.datacollector.model_vars["timestamp"])
         if self.schedule.steps >= (num_data_collected + 1) * self.collect_every_steps:
             self.datacollector.collect(self)
 
     def update_running_flag(self):
-        self.running = (self.schedule.steps <= (1 / TIME_PER_FRAME) * (60 * self.HOW_MANY_MINUTES_TO_RECORD))
+        self.running = (self.schedule.steps < (1 / TIME_PER_FRAME) * (60 * self.HOW_MANY_MINUTES_TO_RECORD))
 
     def step(self):
         """Run one step of the model. """
