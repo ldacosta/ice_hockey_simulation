@@ -1,21 +1,20 @@
-
-import pickle
-import time
 import os
+import pickle
 import random
-import xcs
+import time
+import numpy as np
 from pathlib import Path
+
+import xcs
+from geometry.angle import AngleInRadians
+from geometry.point import Point
+from geometry.vector import X_UNIT_VECTOR
 from typing import Callable, Optional, Tuple, List
 
-from hockey.core.player.base import Player
-from hockey.core.half_rink import HockeyHalfRink
-from hockey.behaviour.core.bitstring_environment_state import BitstringEnvironmentState
-
-import numpy as np
-from geometry.point import Point
-from geometry.angle import AngleInRadians
-from geometry.vector import Vec2d, X_UNIT_VECTOR
 from hockey.behaviour.core.action import HockeyAction
+from hockey.behaviour.core.bitstring_environment_state import BitstringEnvironmentState
+from hockey.core.ice_surface.half_rink import HockeyHalfRink
+from hockey.core.player.base import Player
 
 
 # Diverse actions for the player to perform.
@@ -296,11 +295,6 @@ class Evaluator(object):
         return True
 
 
-import matplotlib.pyplot as plt
-import numpy as np
-from util.base import normalize_to
-
-
 def show_actions_adequacy(episode, brain_file_name, evaluator: Evaluator, height_range=None, width_range=None):
     r_matrix_looking_fwd = evaluator.result_matrix
     fig, axis = plt.subplots()
@@ -379,7 +373,6 @@ def show_sensings(episode, brain_file_name, evaluator, height_range=None, width_
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    import numpy as np
 
     from hockey.behaviour.core.hockey_scenario import GrabThePuckProblem
 

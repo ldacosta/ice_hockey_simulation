@@ -6,11 +6,9 @@ from mesa import Model
 from pathlib import Path
 import os
 import time
-import pandas as pd
 
 from hockey.behaviour.core.hockey_scenario import LearnToPlayHockeyProblem
 from hockey.core.folder_manager import FolderManager
-from typing import Optional, Tuple
 import xcs
 import logging
 from xcs.scenarios import ScenarioObserver

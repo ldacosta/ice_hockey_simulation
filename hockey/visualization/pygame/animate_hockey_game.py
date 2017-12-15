@@ -13,7 +13,7 @@ from typing import Optional
 
 from hockey.behaviour.core.hockey_scenario import GrabThePuckProblem
 from hockey.core.folder_manager import FolderManager
-from hockey.core.half_rink import HockeyHalfRink
+from hockey.core.ice_surface.half_rink import HockeyHalfRink
 from hockey.core.model import TIME_PER_FRAME
 from hockey.core.simulator import MesaModelSimulator, ScenarioSimulator
 from hockey.visualization.pygame.global_def import HALF_ICE_WIDTH, HALF_ICE_HEIGHT
@@ -114,11 +114,12 @@ def main(argv):
         width=HockeyHalfRink.WIDTH_HALF_ICE,
         height=HockeyHalfRink.HEIGHT_ICE,
         how_many_offense=1,
-        how_many_defense=0,
-        one_step_in_seconds=TIME_PER_FRAME,
-        collect_data_every_secs=DATA_EVERY_SECS,
-        record_this_many_minutes=RECORD_THIS_MANY_MINUTES)
+        how_many_defense=0)
     if mode_simulation:
+        hockey_rink.setup_run(
+            one_step_in_seconds=TIME_PER_FRAME,
+            collect_data_every_secs=DATA_EVERY_SECS,
+            record_this_many_minutes=RECORD_THIS_MANY_MINUTES)
         folder_manager.makedirs()
         # let's choose the name of the files were the data will be saved:
         # model

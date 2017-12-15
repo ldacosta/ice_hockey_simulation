@@ -1,10 +1,9 @@
-import unittest
 import os
-import numpy as np
+import unittest
 
-from hockey.core.half_rink import HockeyHalfRink
 from hockey.behaviour.core.hockey_scenario import GrabThePuckProblem
 from hockey.core.evaluator import Evaluator
+from hockey.core.ice_surface.half_rink import HockeyHalfRink
 
 
 class TestEvaluator(unittest.TestCase):

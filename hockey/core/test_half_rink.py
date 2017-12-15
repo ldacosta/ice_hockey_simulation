@@ -1,9 +1,10 @@
 import unittest
 
+from geometry.angle import AngleInRadians
 from geometry.point import Point
 from geometry.vector import Vec2d
-from geometry.angle import AngleInRadians
-from hockey.core.half_rink import HockeyHalfRink
+
+from hockey.core.ice_surface.half_rink import HockeyHalfRink
 
 
 class TestHalfRink(unittest.TestCase):

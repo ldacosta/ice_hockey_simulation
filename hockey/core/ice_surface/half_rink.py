@@ -3,28 +3,18 @@
 
 """
 
-import random
-
-from mesa import Model
-from mesa.datacollection import DataCollector
-from mesa.space import ContinuousSpace, MultiGrid
-from mesa.time import RandomActivation
+from geometry.angle import AngleInRadians
 from geometry.point import Point
 from geometry.vector import Vec2d
-from geometry.angle import AngleInRadians
-
-from util.base import choose_first_option_by_roulette
-from util.geometry.lines import cells_between
-from hockey.core.puck import Puck
+from mesa.datacollection import DataCollector
 from typing import Optional, Tuple
 
 from hockey.behaviour.core.rule_based_brain import RuleBasedBrain
-from hockey.core.object_on_ice import ObjectOnIce
-from hockey.core.player.base import Player
+from hockey.core.ice_surface.ice_rink import SkatingIce
 from hockey.core.player.defense import Defense
-from hockey.core.player.forward import Forward
-from hockey.core.model import TIME_PER_FRAME
-from hockey.core.ice_rink import SkatingIce
+from hockey.core.puck import Puck
+from util.geometry.lines import cells_between
+
 
 class HockeyHalfRink(SkatingIce):
     """The attacking side of a Hockey Rink."""
@@ -44,31 +34,11 @@ class HockeyHalfRink(SkatingIce):
     FACEOFF_TOP_Y = (HEIGHT_ICE - 44) / 2
     FACEOFF_BOTTOM_Y = FACEOFF_TOP_Y + 44
 
-    def get_random_position(self) -> Point:
-        """Returns a random position inside of the half-ice."""
-        return Point(random.random() * self.width, random.random() * self.height)
-
-    def move_agent(self, an_agent: ObjectOnIce, new_pt: Point):
-        """Moves the agent depending on where we live."""
-        # TODO: this is horribly inefficient, but it provides the flexibility of switching between discrete and continuous spaces.
-        # if we are on a continuous space I can move to the real place. Otherwise I have to "cast" to a integer space.
-        if self.is_continuous():
-            self.space.move_agent(an_agent, new_pt)
-        else:
-            self.space.move_agent(an_agent, new_pt.integerize())
-
-
-    def is_continuous(self) -> bool:
-        return isinstance(self.space, ContinuousSpace)
-
     def __init__(self,
                  width: int,
                  height: int,
                  how_many_defense: int,
-                 how_many_offense: int,
-                 one_step_in_seconds: float,
-                 collect_data_every_secs: float,
-                 record_this_many_minutes: int):
+                 how_many_offense: int):
         """
         
         Args:
@@ -76,19 +46,13 @@ class HockeyHalfRink(SkatingIce):
             height: how many divisions on Y
             how_many_defense: 
             how_many_offense: 
-            one_step_in_seconds: 
-            collect_data_every_secs: 
-            record_this_many_minutes: 
         """
-        assert one_step_in_seconds > 0 and how_many_defense >= 0 and how_many_offense >= 0
+        assert how_many_defense >= 0 and how_many_offense >= 0
         SkatingIce.__init__(self,
-                 width,
-                 height,
-                 how_many_defense,
-                 how_many_offense,
-                 one_step_in_seconds,
-                 collect_data_every_secs,
-                 record_this_many_minutes)
+                            width,
+                            height,
+                            how_many_defense,
+                            how_many_offense)
         # data collector
         self.datacollector = DataCollector(
             model_reporters={
@@ -100,7 +64,7 @@ class HockeyHalfRink(SkatingIce):
             },
             agent_reporters={
                 "timestamp": lambda agent: agent.model.schedule.steps * agent.model.one_step_in_seconds,
-                "pos_x": lambda agent : agent.pos.x,
+                "pos_x": lambda agent: agent.pos.x,
                 "pos_y": lambda agent: agent.pos.y,
                 "speed_x": lambda agent: agent.speed.x,
                 "speed_y": lambda agent: agent.speed.y,
@@ -118,6 +82,19 @@ class HockeyHalfRink(SkatingIce):
         self.goal_position = (HockeyHalfRink.GOALIE_X,(HockeyHalfRink.GOALIE_Y_BOTTOM, HockeyHalfRink.GOALIE_Y_TOP))
         # init
         self.reset()
+
+    def reset(self):
+        SkatingIce.reset_agents(self)
+        # number of goals scored, and shots made
+        self.goals_scored = 0
+        self.shots = 0
+        print("Half-ice rink reset")
+
+    def __str__(self):
+        result = SkatingIce.__str__(self)
+        result += "\nGoals scored: %d; shots = %d" % (self.goals_scored, self.shots)
+        result += "\n"
+        return result
 
     def prob_of_scoring_from_distance(self, distance_to_goal: float) -> float:
         # based on http://www.omha.net/news_article/show/667329-the-science-of-scoring

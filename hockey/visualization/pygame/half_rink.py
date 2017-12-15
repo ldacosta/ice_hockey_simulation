@@ -1,12 +1,12 @@
-
 from functools import reduce
+
 from rendering.base import Color
 from rendering.pygame.base import DrawingObjects, DrawingRect, DrawingCircle, DrawingLine, Renderable
 
-from hockey.core.half_rink import HockeyHalfRink
-from hockey.visualization.pygame.world_to_canvas import World2CanvasConverter
-from hockey.visualization.pygame.puck import PuckPygameRenderable
+from hockey.core.ice_surface.half_rink import HockeyHalfRink
 from hockey.visualization.pygame.player import PlayerPygameRenderable
+from hockey.visualization.pygame.puck import PuckPygameRenderable
+from hockey.visualization.pygame.world_to_canvas import World2CanvasConverter
 
 
 class HalfRinklPygameRenderable(Renderable):

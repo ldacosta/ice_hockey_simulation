@@ -16,7 +16,7 @@ from geometry.angle import AngleInRadians
 
 from util.base import choose_first_option_by_roulette
 from hockey.core.puck import Puck
-from typing import Optional, Tuple
+from typing import Optional
 
 from hockey.behaviour.core.rule_based_brain import RuleBasedBrain
 from hockey.core.object_on_ice import ObjectOnIce
@@ -48,10 +48,7 @@ class SkatingIce(Model):
                  width: int,
                  height: int,
                  how_many_defense: int,
-                 how_many_offense: int,
-                 one_step_in_seconds: float,
-                 collect_data_every_secs: float,
-                 record_this_many_minutes: int):
+                 how_many_offense: int):
         """
 
         Args:
@@ -59,17 +56,9 @@ class SkatingIce(Model):
             height: how many divisions on Y
             how_many_defense: 
             how_many_offense: 
-            one_step_in_seconds: 
-            collect_data_every_secs: 
-            record_this_many_minutes: 
         """
-        assert one_step_in_seconds > 0 and how_many_defense >= 0 and how_many_offense >= 0
+        assert how_many_defense >= 0 and how_many_offense >= 0
         Model.__init__(self)
-        self.HOW_MANY_MINUTES_TO_RECORD = record_this_many_minutes
-
-        self.one_step_in_seconds = one_step_in_seconds
-        # every how many steps do I have to collect data:
-        self.collect_every_steps = (1 / self.one_step_in_seconds) * collect_data_every_secs
         self.height = height
         self.width = width
         self.schedule = RandomActivation(self)
@@ -116,11 +105,27 @@ class SkatingIce(Model):
         # put everyone on the scheduler:
         [self.schedule.add(agent) for agent in [self.puck] + self.defense + self.attack]
         # init
+        self.HOW_MANY_MINUTES_TO_RECORD = None
+        self.one_step_in_seconds = None
+        self.collect_every_steps = None # every how many steps do I have to collect data
         self.reset()
+
+
+    def setup_run(self, one_step_in_seconds: float,
+                 collect_data_every_secs: float,
+                 record_this_many_minutes: int):
+        assert one_step_in_seconds > 0
+        self.HOW_MANY_MINUTES_TO_RECORD = record_this_many_minutes
+        self.one_step_in_seconds = one_step_in_seconds
+        self.collect_every_steps = (1 / self.one_step_in_seconds) * collect_data_every_secs
+
+    def has_run_been_setup(self) -> bool:
+        return (self.HOW_MANY_MINUTES_TO_RECORD is not None) and \
+               (self.one_step_in_seconds is not None) and \
+               (self.collect_every_steps is not None)
 
     def __str__(self):
         result = str(self.puck)
-        result += "\nGoals scored: %d; shots = %d" % (self.goals_scored, self.shots)
         result += "\nDefensive squad:\n"
         result += "\n".join([str(player) for player in self.defense])
         result += "\nOffensive squad:\n"
@@ -129,12 +134,10 @@ class SkatingIce(Model):
         return result
 
     def reset(self):
-        # positioning
         self.reset_agents()
-        # number of goals scored, and shots made
-        self.goals_scored = 0
-        self.shots = 0
-        print("Half-ice rink reset")
+        self.HOW_MANY_MINUTES_TO_RECORD = None
+        self.one_step_in_seconds = None
+        self.collect_every_steps = None # every how many steps do I have to collect data
 
     def reset_agents(self):
         """Sets the players positions as at the beginning of an iteration."""
@@ -218,15 +221,9 @@ class SkatingIce(Model):
 
     def step(self):
         """Run one step of the model. """
-        goals_before = self.goals_scored
-        shots_before = self.shots
+        assert self.has_run_been_setup()
         self.schedule.step()
         self.collect_data_if_is_time()
-        if self.shots > shots_before:
-            self.puck.prob_of_goal = 0.0
-        if self.goals_scored > goals_before:
-            print("[half-rink] Goal scored! (now %d in total). Resetting positions of agents" % (self.goals_scored))
-            self.reset_agents()
         self.update_running_flag()
 
     def vector_to_puck(self, a_pos: Point) -> Vec2d:
