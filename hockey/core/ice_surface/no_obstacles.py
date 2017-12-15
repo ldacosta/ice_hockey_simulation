@@ -29,10 +29,7 @@ class IceNxN(SkatingIce):
                             width,
                             height,
                             how_many_defense,
-                            how_many_offense,
-                            one_step_in_seconds,
-                            collect_data_every_secs,
-                            record_this_many_minutes)
+                            how_many_offense)
 
 class Ice5x5(IceNxN):
     """The attacking side of a Hockey Rink."""
