@@ -103,7 +103,7 @@ class ScenarioSimulator(Simulator):
             if not Path(load_from).is_file():
                 raise RuntimeError("File '%s' does not contain a brain" % (load_from))
             last_modified_str = time.ctime(os.stat(load_from).st_mtime)
-            print("Loading model from file '%s' (last modified on %s)..." % (load_from, last_modified_str))
+            print("[Simulator.run] Loading model from file '%s' (last modified on %s)..." % (load_from, last_modified_str))
             model = pickle.load(open(load_from, 'rb'))
             show_good_rules(model)
         print("Loading/Creation Done")
