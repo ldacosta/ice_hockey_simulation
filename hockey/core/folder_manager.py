@@ -37,19 +37,14 @@ class FolderManager(object):
     def brain_file_name(self, episode: int, full: bool) -> str:
         return self.__name_composer__(root_dir=self.brain_dir, str_id="brain", idx_descr="episode", idx=episode, full=full, ext="bin")
 
-    def brain_eval_file_name(self, eval_type: str, episode: int, full: bool) -> str:
-        return self.__name_composer__(root_dir=self.brain_evals_dir, str_id="eval_" + eval_type, idx_descr="episode", idx=episode, full=full, ext="csv")
-
-    def all_evals_for_episode(self, episode: int) -> List[str]:
-        """Gets all evaluations for a brain in a certain episode."""
-        pattern = os.path.join(self.brain_evals_dir, "*%d.csv" % (episode)) # NB: heavily relies on the fact that this is the pattern for the evals' files.
-        return [file for file in glob.glob(pattern)]
+    def brain_eval_file_name(self, episode: int, full: bool) -> str:
+        return self.__name_composer__(root_dir=self.brain_evals_dir, str_id="eval", idx_descr="episode", idx=episode, full=full, ext="csv")
 
     def model_file_name(self, run_number: int, full: bool) -> str:
-        return self.__name_composer__(root_dir=self.model_dir, str_id="model", idx_descr="run", idx=run_number, full=full, ext="csv")
+        return self.__name_composer__(root_dir=self.model_dir, str_id="model", idx_descr="run", idx=run_number, full=full, ext="pd")
 
     def agents_file_name(self, run_number: int, full: bool) -> str:
-        return self.__name_composer__(root_dir=self.agents_dir, str_id="agents", idx_descr="run", idx=run_number, full=full, ext="csv")
+        return self.__name_composer__(root_dir=self.agents_dir, str_id="agents", idx_descr="run", idx=run_number, full=full, ext="pd")
 
     def newest_brain_file(self) -> Optional[str]:
         """Gets newest brain in a folder - None is there is nothing there or the directory doesn't exist."""

@@ -39,34 +39,6 @@ def look_at_left_and_near(p: Player):
 def look_at_left_and_away(p: Player):
     turn_player_until(p, f_cond=lambda a: (a.value > AngleInRadians.PI_HALF and a.value <= AngleInRadians.PI))
 
-# def look_at_right_and_away(p: Player):
-#     p.looking_at = X_UNIT_VECTOR
-#     v2puck = p.model.angle_to_puck(a_pos=p.pos, looking_at=p.looking_at)
-#     while not (v2puck > AngleInRadians.THREE_HALFS_OF_PI):
-#         p.turn_right()
-#         v2puck = p.model.angle_to_puck(a_pos=p.pos, looking_at=p.looking_at)
-#
-# def look_at_right_and_near(p: Player):
-#     p.looking_at = X_UNIT_VECTOR
-#     v2puck = p.model.angle_to_puck(a_pos=p.pos, looking_at=p.looking_at)
-#     while not (v2puck > AngleInRadians.PI and v2puck < AngleInRadians.THREE_HALFS_OF_PI):
-#         p.turn_right()
-#         v2puck = p.model.angle_to_puck(a_pos=p.pos, looking_at=p.looking_at)
-#
-# def look_at_left_and_away(p: Player):
-#     p.looking_at = X_UNIT_VECTOR
-#     v2puck = p.model.angle_to_puck(a_pos=p.pos, looking_at=p.looking_at)
-#     while not (v2puck < AngleInRadians.PI_HALF):
-#         p.turn_right()
-#         v2puck = p.model.angle_to_puck(a_pos=p.pos, looking_at=p.looking_at)
-#
-# def look_at_left_and_near(p: Player):
-#     p.looking_at = X_UNIT_VECTOR
-#     v2puck = p.model.angle_to_puck(a_pos=p.pos, looking_at=p.looking_at)
-#     while not (v2puck > AngleInRadians.PI_HALF and v2puck < AngleInRadians.PI):
-#         p.turn_right()
-#         v2puck = p.model.angle_to_puck(a_pos=p.pos, looking_at=p.looking_at)
-
 class Evaluator(object):
 
     def __init__(self,
@@ -294,22 +266,6 @@ class Evaluator(object):
         assert len(np.argwhere(self.distance2optimal == -1)) == 0
         return result_matrix
 
-    def quality_when_looking_back(self, verbose: bool = False) -> Tuple[float, float]:
-        def look_back(p: Player):
-            p.speed = X_UNIT_VECTOR
-            p.align_with_puck()
-            p.turn_left()
-            p.turn_left()
-
-        self.__performance_matrix__(
-            warm_up=False,
-            pre_sense_fn = look_back,
-            optimal_actions=[HockeyAction.TURN_HARD_RIGHT, HockeyAction.TURN_HARD_LEFT],
-            near_optimal_actions=[],
-            compare_with=None,
-            verbose = verbose)
-        return self.quality_performance()
-
     def update_quality(self, verbose: bool = False) -> Tuple[float, float]:
         self.quality = (0, 0)
         self.perf_matrixes = {}
@@ -321,55 +277,23 @@ class Evaluator(object):
                 near_optimal_actions=[],
                 compare_with=None,
                 verbose=verbose)
-            self.perf_matrixes[action_description] = perf_matrix
             mean_value, std_value = self.quality_performance(perf_matrix)
             if verbose:
-                print("[going round a function] mean = %.2f, std-dev: %.2f" % (mean_value, std_value))
+                print("[%s] mean = %.2f, std-dev: %.2f" % (action_description, mean_value, std_value))
+            self.perf_matrixes[action_description] = (perf_matrix, (mean_value, std_value))
             m, s = self.quality
             self.quality = (m + mean_value, s + std_value)
         m, s = self.quality
         self.quality = (m / len(self.optimal_actions), s / len(self.optimal_actions))
         return self.quality
 
-    def quality_when_looking_at_right_and_away_from_puck(self, verbose: bool = False) -> Tuple[float, float]:
-        perf_matrix = self.__performance_matrix__(
-            warm_up=False,
-            pre_sense_fn = look_at_right_and_away,
-            optimal_actions=[HockeyAction.TURN_HARD_RIGHT],
-            near_optimal_actions=[],
-            compare_with=None,
-            verbose = verbose)
-        return self.quality_performance(perf_matrix)
-
-    def quality_when_looking_at_left(self, verbose: bool = False) -> Tuple[float, float]:
-        def look_at_left(p: Player):
-            p.speed = X_UNIT_VECTOR
-            p.align_with_puck()
-            p.turn_left()
-
-        perf_matrix = self.__performance_matrix__(
-            warm_up=False,
-            pre_sense_fn = look_at_left,
-            optimal_actions=[HockeyAction.TURN_HARD_RIGHT],
-            near_optimal_actions=[],
-            compare_with=None,
-            verbose = verbose)
-        return self.quality_performance(perf_matrix)
-
-    def quality_when_looking_at_puck(self, verbose: bool = False) -> Tuple[float, float]:
-        def look_at_puck(p: Player):
-            p.speed = X_UNIT_VECTOR
-            p.align_with_puck()
-
-            perf_matrix = self.__performance_matrix__(
-            warm_up=False,
-            pre_sense_fn = look_at_puck,
-            optimal_actions=[HockeyAction.SKATE_MIN_SPEED],
-            near_optimal_actions=[],
-            compare_with=None,
-            verbose = verbose)
-        return self.quality_performance(perf_matrix)
-
+    def save_performances_to(self, full_file_name: str) -> bool:
+        if len(self.perf_matrixes) == 0:
+            print("[saving performances] dictionary with matrices is empty. Nor saving anything.")
+            return False
+        with open(full_file_name, "wb") as pickle_out:
+            pickle.dump(self.perf_matrixes, pickle_out)
+        return True
 
 
 import matplotlib.pyplot as plt
