@@ -54,8 +54,8 @@ class LearnToPlayHockeyProblem(Scenario, metaclass=abc.ABCMeta):
         random.shuffle(self.players_to_sample)
         self.player_sensing_idx = 0
         self.episode_finished = False
-        self.episode_start_in_secs = self.seconds_in_simulation()
-        self.reset()
+        self.reset_players_and_puck()
+        self.hockey_world.reset()
 
     @property
     def is_dynamic(self):
