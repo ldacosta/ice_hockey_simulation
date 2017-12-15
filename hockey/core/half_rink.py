@@ -24,8 +24,9 @@ from hockey.core.player.base import Player
 from hockey.core.player.defense import Defense
 from hockey.core.player.forward import Forward
 from hockey.core.model import TIME_PER_FRAME
+from hockey.core.ice_rink import SkatingIce
 
-class HockeyHalfRink(Model):
+class HockeyHalfRink(SkatingIce):
     """The attacking side of a Hockey Rink."""
 
     WIDTH_HALF_ICE = 5 # 100 # TODO!
@@ -48,23 +49,13 @@ class HockeyHalfRink(Model):
         return Point(random.random() * self.width, random.random() * self.height)
 
     def move_agent(self, an_agent: ObjectOnIce, new_pt: Point):
-        """
-        Moves the agent depending on where we live.
-        Args:
-            an_agent: 
-            new_pt: 
-
-        Returns:
-            Nothing.
-
-        """
+        """Moves the agent depending on where we live."""
         # TODO: this is horribly inefficient, but it provides the flexibility of switching between discrete and continuous spaces.
         # if we are on a continuous space I can move to the real place. Otherwise I have to "cast" to a integer space.
         if self.is_continuous():
             self.space.move_agent(an_agent, new_pt)
         else:
-            new_pt.integerize()
-            self.space.move_agent(an_agent, new_pt) # stupid non-functional Python
+            self.space.move_agent(an_agent, new_pt.integerize())
 
 
     def is_continuous(self) -> bool:
@@ -90,18 +81,14 @@ class HockeyHalfRink(Model):
             record_this_many_minutes: 
         """
         assert one_step_in_seconds > 0 and how_many_defense >= 0 and how_many_offense >= 0
-        Model.__init__(self)
-        self.HOW_MANY_MINUTES_TO_RECORD = record_this_many_minutes
-
-        self.one_step_in_seconds = one_step_in_seconds
-        # every how many steps do I have to collect data:
-        self.collect_every_steps = (1 / self.one_step_in_seconds) * collect_data_every_secs
-        self.height = height
-        self.width = width
-        self.schedule = RandomActivation(self)
-        # if this was a Grid, the attribute would be called 'self.grid'
-        # But because it is continuous, it is called 'self.space'
-        self.space = MultiGrid(width=self.width, height=self.height, torus=False)
+        SkatingIce.__init__(self,
+                 width,
+                 height,
+                 how_many_defense,
+                 how_many_offense,
+                 one_step_in_seconds,
+                 collect_data_every_secs,
+                 record_this_many_minutes)
         # data collector
         self.datacollector = DataCollector(
             model_reporters={
@@ -129,83 +116,8 @@ class HockeyHalfRink(Model):
         )
         #
         self.goal_position = (HockeyHalfRink.GOALIE_X,(HockeyHalfRink.GOALIE_Y_BOTTOM, HockeyHalfRink.GOALIE_Y_TOP))
-        self.count_defense = how_many_defense
-        self.count_attackers = how_many_offense
-        # Set up agents
-        # init puck position
-        self.puck = Puck(hockey_world_model=self)
-        # defensive players: creation and random positioning
-        self.defense = [Defense(hockey_world_model=self, brain=RuleBasedBrain()) for _ in range(self.count_defense)]
-        # offensive players: creation and random positioning
-        self.attack = [Forward(hockey_world_model=self, brain=RuleBasedBrain()) for _ in range(self.count_attackers)]
-        # put everyone on the scheduler:
-        [self.schedule.add(agent) for agent in [self.puck] + self.defense + self.attack]
         # init
         self.reset()
-
-    def __str__(self):
-        result = str(self.puck)
-        result += "\nGoals scored: %d; shots = %d" % (self.goals_scored, self.shots)
-        result += "\nDefensive squad:\n"
-        result += "\n".join([str(player) for player in self.defense])
-        result += "\nOffensive squad:\n"
-        result += "\n player \n".join([str(player) for player in self.attack])
-        result += "\n"
-        return result
-
-    def reset(self):
-        # positioning
-        self.reset_agents()
-        # number of goals scored, and shots made
-        self.goals_scored = 0
-        self.shots = 0
-        print("Half-ice rink reset")
-
-    def reset_agents(self):
-        """Sets the players positions as at the beginning of an iteration."""
-
-        self.release_puck()
-        self.puck.speed = Vec2d(0, 0)
-        self.set_random_positions_for_agents()
-        # align with puck:
-        [defense_player.align_with_puck() for defense_player in self.defense]
-        [attacker.align_with_puck() for attacker in self.attack]
-
-    def set_random_positions_for_agents(self):
-        """Sets the players positions as at the beginning of an iteration."""
-
-        self.space.place_agent(self.puck, pos = Point(0,0))
-        [defense_player.reset(to_speed=Player.VERY_LOW_SPEED) for defense_player in self.defense]
-        [attack_player.reset(to_speed=Player.VERY_LOW_SPEED) for attack_player in self.attack]
-        p_player = Point(HockeyHalfRink.WIDTH_HALF_ICE - 1,HockeyHalfRink.HEIGHT_ICE - 1)
-        [self.space.place_agent(defense_player, pos = p_player) for defense_player in self.defense]
-        [self.space.place_agent(attacker, pos = p_player) for attacker in self.attack]
-        # TODO: _this_ is really 'random': (have to put it back)
-        # self.space.place_agent(self.puck, pos = self.get_random_position())
-        # [self.space.place_agent(defense_player, pos = self.get_random_position()) for defense_player in self.defense]
-        # [self.space.place_agent(attacker, pos = self.get_random_position()) for attacker in self.attack]
-        #
-
-
-    def puck_request_by(self, agent):
-        """
-        TODO: has to return True / False!
-        
-        Args:
-            agent: 
-
-        Returns:
-
-        """
-        current_owner = self.who_has_the_puck()
-        if current_owner is None:
-            self.give_puck_to(agent)
-        else:
-            power_holder = current_owner.power
-            power_requester = agent.power
-            if not choose_first_option_by_roulette(weight_1=power_holder, weight_2=power_requester):
-                # print("[puck_request_by(%s)]: owner (strength %.2f) lost the puck to me (strength %.2f)" % (agent.unique_id, power_holder, power_requester))
-                self.give_puck_to(agent)
 
     def prob_of_scoring_from_distance(self, distance_to_goal: float) -> float:
         # based on http://www.omha.net/news_article/show/667329-the-science-of-scoring
@@ -244,42 +156,6 @@ class HockeyHalfRink(Model):
         """Distance, in feet, to closest goal post"""
         return min(self.distance_to_goal_posts(a_pos))
 
-    def distance_to_puck(self, a_pos: Point) -> float:
-        return Vec2d.from_to(from_pt=a_pos, to_pt=self.puck.pos).norm()
-
-    def release_puck(self):
-        current_owner = self.who_has_the_puck()
-        if current_owner is not None:
-            current_owner.release_puck()
-
-    def give_puck_to(self, agent):
-        if not agent.have_puck:
-            self.release_puck()
-            agent.have_puck = True
-            self.puck.is_taken = True
-            self.space.place_agent(self.puck, pos=agent.pos)
-
-    def who_has_the_puck(self) -> Optional[Player]:
-        """Returns None in no-one has the puck; otherwise returns the agent that has it."""
-        for player in self.defense + self.attack:
-            if player.have_puck:
-                # print("[ICE] %s has the puck (its pos: %s; puck's: %s)" % (player.unique_id, player.pos, self.puck.pos))
-                return player
-        return None
-
-    def is_puck_taken(self) -> bool:
-        return not (self.who_has_the_puck() is None)
-
-
-    def collect_data_if_is_time(self):
-        # self.schedule.steps
-        num_data_collected = len(self.datacollector.model_vars['goals'])
-        if self.schedule.steps >= (num_data_collected + 1) * self.collect_every_steps:
-            self.datacollector.collect(self)
-
-    def update_running_flag(self):
-        self.running  = (self.schedule.steps <= (1 / TIME_PER_FRAME) * (60 * self.HOW_MANY_MINUTES_TO_RECORD))
-
     def step(self):
         """Run one step of the model. """
         goals_before = self.goals_scored
@@ -292,17 +168,6 @@ class HockeyHalfRink(Model):
             print("[half-rink] Goal scored! (now %d in total). Resetting positions of agents" % (self.goals_scored))
             self.reset_agents()
         self.update_running_flag()
-
-    def vector_to_puck(self, a_pos: Point) -> Vec2d:
-        return Vec2d.from_to(from_pt=a_pos, to_pt=self.puck.pos)
-
-    def angle_to_puck(self, a_pos: Point, looking_at: Vec2d) -> AngleInRadians:
-        """
-        Angle to puck, defined in [0, 2Pi]. If puck is at the right of the vector
-        defined by a straight line right in front of me, then this angle will be in [Pi, 2Pi]
-        If it's at my left, the angle is in [0,Pi]
-        """
-        return looking_at.angle_to(self.vector_to_puck(a_pos))
 
     def vectors_to_goal(self, a_pos: Point) -> Tuple[Vec2d, Vec2d]:
         return (Vec2d.from_to(from_pt=a_pos, to_pt=self.GOALIE_POST_1),
