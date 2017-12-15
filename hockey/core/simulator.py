@@ -6,11 +6,9 @@ from mesa import Model
 from pathlib import Path
 import os
 import time
-import pandas as pd
 
 from hockey.behaviour.core.hockey_scenario import LearnToPlayHockeyProblem
 from hockey.core.folder_manager import FolderManager
-from typing import Optional, Tuple
 import xcs
 import logging
 from xcs.scenarios import ScenarioObserver
@@ -105,7 +103,7 @@ class ScenarioSimulator(Simulator):
             if not Path(load_from).is_file():
                 raise RuntimeError("File '%s' does not contain a brain" % (load_from))
             last_modified_str = time.ctime(os.stat(load_from).st_mtime)
-            print("Loading model from file '%s' (last modified on %s)..." % (load_from, last_modified_str))
+            print("[Simulator.run] Loading model from file '%s' (last modified on %s)..." % (load_from, last_modified_str))
             model = pickle.load(open(load_from, 'rb'))
             show_good_rules(model)
         print("Loading/Creation Done")
@@ -136,10 +134,18 @@ class ScenarioSimulator(Simulator):
                               load_from_full_file_name=full_brain_file_name,
                               total_number_of_actions=len(self.hockey_problem.possible_actions), steps_in_height=1,
                               steps_in_widht=1)
-        for action_description, the_matrix in evaluator.perf_matrixes.items():
-            eval_full_file_name = self.folder_manager.brain_eval_file_name(episode=idx, eval_type=action_description, full=True)
-            print("[%s] Saving results of evaluation in %s" % (action_description, eval_full_file_name))
-            pd.DataFrame(the_matrix).to_csv(eval_full_file_name, header=None, index=None)
+        if not evaluator.save_performances_to(full_file_name=self.folder_manager.brain_eval_file_name(episode=idx, full=True)):
+            print("PROBLEM saving performances to disk.")
+
+
+        # for action_description, the_matrix in evaluator.perf_matrixes.items():
+        #     eval_full_file_name = self.folder_manager.brain_eval_file_name(episode=idx, eval_type=action_description, full=True)
+        #     print("[%s] Saving results of evaluation in %s" % (action_description, eval_full_file_name))
+        #
+        #     with open("dict.pickle", "wb") as pickle_out:
+        #         pickle.dump(a_dict, pickle_out)
+        #
+        #     pd.DataFrame(the_matrix).to_csv(eval_full_file_name, header=None, index=None)
         print("Evaluation of Brain Done")
 
         # steps, reward, seconds, model = xcs.test(algorithm, scenario=self.scenario) # algorithm=XCSAlgorithm,

@@ -1,39 +1,27 @@
+#!/usr/bin/env python
+"""A piece of ice.
+
+"""
 
 import abc
 import random
-from typing import Optional
 import time
 
-from xcs.scenarios import Scenario
+from typing import Optional
 from xcs.bitstrings import BitString
-from util.geometry.lines import StraightLine
+from xcs.scenarios import Scenario
 
-from hockey.core.half_rink import HockeyHalfRink
 from hockey.behaviour.core.action import HockeyAction
 from hockey.behaviour.core.bitstring_environment_state import BitstringEnvironmentState
+from hockey.core.ice_surface.ice_rink import SkatingIce
 
-from hockey.core.player.base import Player
 
-# class PlayerMetrics(object):
-#
-#     def __init__(self, a_player: Player):
-#         self.player = a_player
-#         self.update()
-#
-#     def update(self):
-#         self.goals = self.player.model.goals_scored
-#         self.shots = self.player.model.shots
-#         self.distance_to_goal = self.player.model.distance_to_goal(self.player.pos)
-#         self.distance_to_puck = self.player.model.distance_to_puck(self.player.pos)
-#         self.have_puck = self.player.have_puck
-#
-#
 class LearnToPlayHockeyProblem(Scenario, metaclass=abc.ABCMeta):
     """Learning to play soccer with XCS"""
 
     REWARD_FOR_GOAL = 1000.0
 
-    def __init__(self, hockey_world: HockeyHalfRink):
+    def __init__(self, piece_of_ice: SkatingIce):
         self.possible_actions = list(HockeyAction)
         # I will remove atomic actions for which I don't want to respond (or don't know how to):
         self.possible_actions.remove(HockeyAction.SHOOT)
@@ -61,13 +49,13 @@ class LearnToPlayHockeyProblem(Scenario, metaclass=abc.ABCMeta):
         for action in self.possible_actions:
             print(action)
 
-        self.hockey_world = hockey_world
+        self.hockey_world = piece_of_ice
         self.players_to_sample = self.hockey_world.defense + self.hockey_world.attack
         random.shuffle(self.players_to_sample)
         self.player_sensing_idx = 0
         self.episode_finished = False
-        self.episode_start_in_secs = self.seconds_in_simulation()
-        self.reset()
+        self.reset_players_and_puck()
+        self.hockey_world.reset()
 
     @property
     def is_dynamic(self):
@@ -153,7 +141,7 @@ class GrabThePuckProblem(LearnToPlayHockeyProblem):
     punishment_action_failed = -1/2
     punishment_loss_energy = -1 # each time step, I lose energy
 
-    def __init__(self, hockey_world: HockeyHalfRink):
+    def __init__(self, hockey_world: SkatingIce):
         LearnToPlayHockeyProblem.__init__(self, hockey_world)
         print("reward_shot = %.2f" % (GrabThePuckProblem.reward_shot))
         print("reward_get_puck = %.2f" % (GrabThePuckProblem.reward_get_puck))
@@ -172,19 +160,68 @@ class GrabThePuckProblem(LearnToPlayHockeyProblem):
         if self.player_sensing is None:
             return None
         else:
-            distance_to_goal_before = self.hockey_world.distance_to_goal(self.player_sensing.pos)
-            distance_to_puck_before = self.hockey_world.distance_to_puck(self.player_sensing.pos)
-            have_puck_before = self.player_sensing.have_puck
             action_successful = self.player_sensing.apply_actions([action]) # TODO: should I penalize for impossible actions (eg, shooting when puck is not owned. Function returns 'False' in that case).
-            distance_to_goal_after = self.hockey_world.distance_to_goal(self.player_sensing.pos)
-            distance_to_puck_after = self.hockey_world.distance_to_puck(self.player_sensing.pos)
             have_puck_after = self.player_sensing.have_puck
-            # sanity checking
-            # if action == HockeyAction.GRAB_PUCK:
-            #     assert (action_successful == have_puck_after)
 
             seconds_in_simulation = self.seconds_in_simulation()
-            # self.feedback = Feedback(simulation_seconds=seconds_in_simulation, real_date_str=time.ctime())
+            self.feedback.reset_to(simulation_seconds=seconds_in_simulation, real_date_str=time.ctime())
+            if (self.seconds_in_simulation_last_feedback < 0) or \
+                    (self.seconds_in_simulation_last_feedback <= seconds_in_simulation - 3 * 60):
+                add_to_feedback("%d seconds (minute %d) elapsed in simulation" % (seconds_in_simulation, seconds_in_simulation // 60), force=True)
+                self.seconds_in_simulation_last_feedback = seconds_in_simulation
+            reward = GrabThePuckProblem.punishment_loss_energy # agent loses energy by default
+            # Rewards related to the action I did last:
+            if not action_successful: # if action was unsuccessful, let's clear the deck:
+                reward += self.punishment_action_failed
+                add_to_feedback("Action '%s' not successful. Cumulated reward = %.2f" % (action, reward))
+            else:
+                if have_puck_after:
+                    reward += self.reward_get_puck
+                    add_to_feedback("Grabbed puck! (cumulated reward is %.2f)" % (reward), force=True)
+
+            if self.puck_turn_idx == self.player_sensing_idx + 1:
+                self.hockey_world.puck.step() # ok then, move the puck!
+            # has this episode finished?
+            self.episode_finished = have_puck_after
+            if have_puck_after:
+                add_to_feedback("Agent [%s] has the puck, episode finished." % (self.player_sensing.unique_id))
+            if not self.feedback.is_empty():
+                add_to_feedback("[action: %s]  ===============> returning reward %.2f" % (action, reward))
+                print("%s" % (self.feedback))
+                self.seconds_in_simulation_last_feedback = seconds_in_simulation
+            return reward
+
+class ScoreAGoalProblem(LearnToPlayHockeyProblem):
+    """Rewards for a would-be attacker."""
+
+    reward_shot = LearnToPlayHockeyProblem.REWARD_FOR_GOAL / 30  # TODO: we should reward relative to distance from goal...
+    reward_get_puck = reward_shot / 10  # reward_get_closer_to_puck * 100
+    punishment_action_failed = -1/2
+    punishment_loss_energy = -1 # each time step, I lose energy
+
+    def __init__(self, hockey_world: SkatingIce):
+        LearnToPlayHockeyProblem.__init__(self, hockey_world)
+        print("reward_shot = %.2f" % (GrabThePuckProblem.reward_shot))
+        print("reward_get_puck = %.2f" % (GrabThePuckProblem.reward_get_puck))
+        print("punishment_action_failed = %.2f" % (GrabThePuckProblem.punishment_action_failed))
+        print("punishment_loss_energy = %.2f" % (GrabThePuckProblem.punishment_loss_energy))
+        self.seconds_in_simulation_last_feedback = -1 # when was the last time I gave feedback?
+        self.feedback = Feedback(simulation_seconds=0, real_date_str=time.ctime())
+
+    def execute(self, action) -> Optional[float]:
+        def add_to_feedback(msg: str, force: bool = False):
+            """Potentially adds to feedback."""
+            if (not self.feedback.is_empty()) or (force):
+                self.feedback += msg
+
+        # first, let's get the player to execute this action on his/her environment:
+        if self.player_sensing is None:
+            return None
+        else:
+            action_successful = self.player_sensing.apply_actions([action]) # TODO: should I penalize for impossible actions (eg, shooting when puck is not owned. Function returns 'False' in that case).
+            have_puck_after = self.player_sensing.have_puck
+
+            seconds_in_simulation = self.seconds_in_simulation()
             self.feedback.reset_to(simulation_seconds=seconds_in_simulation, real_date_str=time.ctime())
             if (self.seconds_in_simulation_last_feedback < 0) or \
                     (self.seconds_in_simulation_last_feedback <= seconds_in_simulation - 3 * 60):

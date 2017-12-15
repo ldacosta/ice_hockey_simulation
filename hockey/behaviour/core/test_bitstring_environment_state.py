@@ -1,11 +1,14 @@
 import unittest
 from random import sample as randomsample
-from xcs.bitstrings import BitString as XCSBitString, BitCondition
 
-from hockey.core.half_rink import HockeyHalfRink
 from geometry.angle import AngleInRadians
+from xcs.bitstrings import BitCondition
+
+from hockey.behaviour.core.bitstring_environment_state import BitstringEnvironmentState, angle_to_bitstring, \
+    distance_to_bitstring
 from hockey.behaviour.core.environment_state import EnvironmentState
-from hockey.behaviour.core.bitstring_environment_state import BitstringEnvironmentState, angle_to_bitstring, distance_to_bitstring
+from hockey.core.ice_surface.half_rink import HockeyHalfRink
+
 
 class TestBitstringEncoding(unittest.TestCase):
     """Testing definitions of a player."""

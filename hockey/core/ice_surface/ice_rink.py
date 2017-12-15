@@ -3,7 +3,10 @@
 
 """
 
+
 import random
+import os
+import pandas as pd
 
 from mesa import Model
 from mesa.datacollection import DataCollector
@@ -14,10 +17,10 @@ from geometry.vector import Vec2d
 from geometry.angle import AngleInRadians
 
 from util.base import choose_first_option_by_roulette
-from util.geometry.lines import cells_between
 from hockey.core.puck import Puck
-from typing import Optional, Tuple
+from typing import Optional
 
+from hockey.core.folder_manager import FolderManager
 from hockey.behaviour.core.rule_based_brain import RuleBasedBrain
 from hockey.core.object_on_ice import ObjectOnIce
 from hockey.core.player.base import Player
@@ -25,47 +28,21 @@ from hockey.core.player.defense import Defense
 from hockey.core.player.forward import Forward
 from hockey.core.model import TIME_PER_FRAME
 
-class HockeyHalfRink(Model):
+class SkatingIce(Model):
     """The attacking side of a Hockey Rink."""
-
-    WIDTH_HALF_ICE = 5 # 100 # TODO!
-    HEIGHT_ICE = 5 # 85 # TODO!
-    GOALIE_X = WIDTH_HALF_ICE - 11
-    GOALIE_WIDTH = 6
-    GOALIE_Y_BOTTOM = HEIGHT_ICE / 2 - GOALIE_WIDTH / 2
-    GOALIE_Y_TOP = GOALIE_Y_BOTTOM + GOALIE_WIDTH
-    GOALIE_CENTER = Point(GOALIE_X, (GOALIE_Y_TOP + GOALIE_Y_BOTTOM) / 2)
-    GOALIE_POST_1 = Point(GOALIE_X, GOALIE_Y_BOTTOM)
-    GOALIE_POST_2 = Point(GOALIE_X, GOALIE_Y_TOP)
-    OFF_FACEOFF_X = GOALIE_X - 20
-    BLUE_LINE_X = 25
-    NEUTRAL_FACEOFF_X = BLUE_LINE_X - 2
-    FACEOFF_TOP_Y = (HEIGHT_ICE - 44) / 2
-    FACEOFF_BOTTOM_Y = FACEOFF_TOP_Y + 44
 
     def get_random_position(self) -> Point:
         """Returns a random position inside of the half-ice."""
         return Point(random.random() * self.width, random.random() * self.height)
 
     def move_agent(self, an_agent: ObjectOnIce, new_pt: Point):
-        """
-        Moves the agent depending on where we live.
-        Args:
-            an_agent: 
-            new_pt: 
-
-        Returns:
-            Nothing.
-
-        """
+        """Moves the agent depending on where we live."""
         # TODO: this is horribly inefficient, but it provides the flexibility of switching between discrete and continuous spaces.
         # if we are on a continuous space I can move to the real place. Otherwise I have to "cast" to a integer space.
         if self.is_continuous():
             self.space.move_agent(an_agent, new_pt)
         else:
-            new_pt.integerize()
-            self.space.move_agent(an_agent, new_pt) # stupid non-functional Python
-
+            self.space.move_agent(an_agent, new_pt.integerize())
 
     def is_continuous(self) -> bool:
         return isinstance(self.space, ContinuousSpace)
@@ -74,28 +51,17 @@ class HockeyHalfRink(Model):
                  width: int,
                  height: int,
                  how_many_defense: int,
-                 how_many_offense: int,
-                 one_step_in_seconds: float,
-                 collect_data_every_secs: float,
-                 record_this_many_minutes: int):
+                 how_many_offense: int):
         """
-        
+
         Args:
             width: how many divisions on X
             height: how many divisions on Y
             how_many_defense: 
             how_many_offense: 
-            one_step_in_seconds: 
-            collect_data_every_secs: 
-            record_this_many_minutes: 
         """
-        assert one_step_in_seconds > 0 and how_many_defense >= 0 and how_many_offense >= 0
+        assert how_many_defense >= 0 and how_many_offense >= 0
         Model.__init__(self)
-        self.HOW_MANY_MINUTES_TO_RECORD = record_this_many_minutes
-
-        self.one_step_in_seconds = one_step_in_seconds
-        # every how many steps do I have to collect data:
-        self.collect_every_steps = (1 / self.one_step_in_seconds) * collect_data_every_secs
         self.height = height
         self.width = width
         self.schedule = RandomActivation(self)
@@ -108,19 +74,18 @@ class HockeyHalfRink(Model):
                 "steps": lambda m: m.schedule.steps,
                 "timestamp": lambda m: m.schedule.steps * m.one_step_in_seconds,
                 "puck_is_taken": lambda m: m.puck.is_taken,
-                "goals": lambda m: m.goals_scored,
-                "shots": lambda m: m.shots,
             },
             agent_reporters={
                 "timestamp": lambda agent: agent.model.schedule.steps * agent.model.one_step_in_seconds,
-                "pos_x": lambda agent : agent.pos.x,
+                "pos_x": lambda agent: agent.pos.x,
                 "pos_y": lambda agent: agent.pos.y,
                 "speed_x": lambda agent: agent.speed.x,
                 "speed_y": lambda agent: agent.speed.y,
                 "speed_magnitude": lambda agent: agent.speed.norm(),
-                "topuck_x": lambda agent: agent.model.vector_to_puck(a_pos = agent.pos).x if type(agent) != Puck else "",
-                "topuck_y": lambda agent: agent.model.vector_to_puck(a_pos = agent.pos).y if type(agent) != Puck else "",
-                "angle2puck": lambda agent: agent.model.angle_to_puck(a_pos = agent.pos, looking_at = agent.vector_looking_at()) if type(agent) != Puck else "",
+                "topuck_x": lambda agent: agent.model.vector_to_puck(a_pos=agent.pos).x if type(agent) != Puck else "",
+                "topuck_y": lambda agent: agent.model.vector_to_puck(a_pos=agent.pos).y if type(agent) != Puck else "",
+                "angle2puck": lambda agent: agent.model.angle_to_puck(a_pos=agent.pos,
+                                                                      looking_at=agent.vector_looking_at()) if type(agent) != Puck else "",
                 "last_action": lambda agent: agent.last_action if type(agent) != Puck else "",
                 "have_puck": lambda agent: agent.have_puck if type(agent) != Puck else "",
                 "can_see_puck": lambda agent: agent.can_see_puck() if type(agent) != Puck else "",
@@ -128,7 +93,6 @@ class HockeyHalfRink(Model):
             }
         )
         #
-        self.goal_position = (HockeyHalfRink.GOALIE_X,(HockeyHalfRink.GOALIE_Y_BOTTOM, HockeyHalfRink.GOALIE_Y_TOP))
         self.count_defense = how_many_defense
         self.count_attackers = how_many_offense
         # Set up agents
@@ -141,11 +105,55 @@ class HockeyHalfRink(Model):
         # put everyone on the scheduler:
         [self.schedule.add(agent) for agent in [self.puck] + self.defense + self.attack]
         # init
+        self.HOW_MANY_MINUTES_TO_RECORD = None
+        self.one_step_in_seconds = None
+        self.collect_every_steps = None # every how many steps do I have to collect data
         self.reset()
+
+    def save_activity(self, folder_manager: FolderManager):
+        latest_model_file = folder_manager.newest_model_file()
+        # max_tick = 0
+        max_step = 0
+        max_timestamp = 0
+        if (latest_model_file is not None) and os.path.exists(latest_model_file):
+            # update max's
+            model_df = pd.read_csv(latest_model_file)
+            # max_tick = max(max_tick, model_df["Unnamed: 0"].max())
+            max_step = model_df["steps"].max()
+            max_timestamp = model_df["timestamp"].max()
+            print("Updating max_steps to %d, max_timestamp to %.2f" % (max_step, max_timestamp))
+        _, full_model_file_name = folder_manager.suggest_model_file_name()
+        print("[Model file] Chosen '%s'" % (full_model_file_name))
+        # agents
+        _, full_agents_file_name = folder_manager.suggest_agents_file_name()
+        print("[Agents file] Chosen '%s'\n" % (full_agents_file_name))
+        # update data
+        model_df = self.datacollector.get_model_vars_dataframe()
+        model_df["steps"] += max_step
+        model_df["timestamp"] += max_timestamp
+        agents_df = self.datacollector.get_agent_vars_dataframe()
+        agents_df["timestamp"] += max_timestamp
+        # ok, now save
+        model_df.to_csv(full_model_file_name)
+        agents_df.to_csv(full_agents_file_name)
+
+
+    def setup_run(self, one_step_in_seconds: float,
+                 collect_data_every_secs: float,
+                 record_this_many_minutes: int):
+        assert one_step_in_seconds > 0
+        self.HOW_MANY_MINUTES_TO_RECORD = record_this_many_minutes
+        self.one_step_in_seconds = one_step_in_seconds
+        self.collect_every_steps = (1 / self.one_step_in_seconds) * collect_data_every_secs
+        self.reset()
+
+    def has_run_been_setup(self) -> bool:
+        return (self.HOW_MANY_MINUTES_TO_RECORD is not None) and \
+               (self.one_step_in_seconds is not None) and \
+               (self.collect_every_steps is not None)
 
     def __str__(self):
         result = str(self.puck)
-        result += "\nGoals scored: %d; shots = %d" % (self.goals_scored, self.shots)
         result += "\nDefensive squad:\n"
         result += "\n".join([str(player) for player in self.defense])
         result += "\nOffensive squad:\n"
@@ -154,12 +162,7 @@ class HockeyHalfRink(Model):
         return result
 
     def reset(self):
-        # positioning
         self.reset_agents()
-        # number of goals scored, and shots made
-        self.goals_scored = 0
-        self.shots = 0
-        print("Half-ice rink reset")
 
     def reset_agents(self):
         """Sets the players positions as at the beginning of an iteration."""
@@ -174,23 +177,22 @@ class HockeyHalfRink(Model):
     def set_random_positions_for_agents(self):
         """Sets the players positions as at the beginning of an iteration."""
 
-        self.space.place_agent(self.puck, pos = Point(0,0))
+        self.space.place_agent(self.puck, pos=Point(0, 0))
         [defense_player.reset(to_speed=Player.VERY_LOW_SPEED) for defense_player in self.defense]
         [attack_player.reset(to_speed=Player.VERY_LOW_SPEED) for attack_player in self.attack]
-        p_player = Point(HockeyHalfRink.WIDTH_HALF_ICE - 1,HockeyHalfRink.HEIGHT_ICE - 1)
-        [self.space.place_agent(defense_player, pos = p_player) for defense_player in self.defense]
-        [self.space.place_agent(attacker, pos = p_player) for attacker in self.attack]
+        p_player = Point(self.width - 1, self.height - 1)
+        [self.space.place_agent(defense_player, pos=p_player) for defense_player in self.defense]
+        [self.space.place_agent(attacker, pos=p_player) for attacker in self.attack]
         # TODO: _this_ is really 'random': (have to put it back)
         # self.space.place_agent(self.puck, pos = self.get_random_position())
         # [self.space.place_agent(defense_player, pos = self.get_random_position()) for defense_player in self.defense]
         # [self.space.place_agent(attacker, pos = self.get_random_position()) for attacker in self.attack]
         #
 
-
     def puck_request_by(self, agent):
         """
         TODO: has to return True / False!
-        
+
         Args:
             agent: 
 
@@ -206,43 +208,6 @@ class HockeyHalfRink(Model):
             if not choose_first_option_by_roulette(weight_1=power_holder, weight_2=power_requester):
                 # print("[puck_request_by(%s)]: owner (strength %.2f) lost the puck to me (strength %.2f)" % (agent.unique_id, power_holder, power_requester))
                 self.give_puck_to(agent)
-
-    def prob_of_scoring_from_distance(self, distance_to_goal: float) -> float:
-        # based on http://www.omha.net/news_article/show/667329-the-science-of-scoring
-        if distance_to_goal <= 10:
-            return 0.21
-        elif distance_to_goal <= 20:
-            return 0.34
-        elif distance_to_goal <= 30:
-            return 0.18
-        elif distance_to_goal <= 40:
-            return 0.11
-        elif distance_to_goal <= 50:
-            return 0.07
-        elif distance_to_goal <= 60:
-            return 0.05
-        else:
-            return 0.00
-
-    def prob_of_scoring_from(self, a_pos: Point) -> float:
-        """Probability of scoring from a certain point on the half-ice."""
-        if a_pos.x > self.GOALIE_X:
-            # behind the goal. Pas de chance.
-            return 0.0
-        else:
-            return self.prob_of_scoring_from_distance(self.distance_to_goal(a_pos))
-
-    def distance_to_goal(self, a_pos: Point) -> float:
-        return Vec2d.from_to(from_pt=a_pos, to_pt=self.GOALIE_CENTER).norm()
-
-    def distance_to_goal_posts(self, a_pos: Point) -> Tuple[float, float]:
-        """Distance, in feet, to both goal posts"""
-        return (a_pos.distance_to(another_point=self.GOALIE_POST_1),
-                a_pos.distance_to(another_point=self.GOALIE_POST_2))
-
-    def distance_to_closest_goal_post(self, a_pos: Point) -> float:
-        """Distance, in feet, to closest goal post"""
-        return min(self.distance_to_goal_posts(a_pos))
 
     def distance_to_puck(self, a_pos: Point) -> float:
         return Vec2d.from_to(from_pt=a_pos, to_pt=self.puck.pos).norm()
@@ -270,27 +235,21 @@ class HockeyHalfRink(Model):
     def is_puck_taken(self) -> bool:
         return not (self.who_has_the_puck() is None)
 
-
     def collect_data_if_is_time(self):
+        assert self.has_run_been_setup()
         # self.schedule.steps
-        num_data_collected = len(self.datacollector.model_vars['goals'])
+        num_data_collected = len(self.datacollector.model_vars["timestamp"])
         if self.schedule.steps >= (num_data_collected + 1) * self.collect_every_steps:
             self.datacollector.collect(self)
 
     def update_running_flag(self):
-        self.running  = (self.schedule.steps <= (1 / TIME_PER_FRAME) * (60 * self.HOW_MANY_MINUTES_TO_RECORD))
+        self.running = (self.schedule.steps < (1 / TIME_PER_FRAME) * (60 * self.HOW_MANY_MINUTES_TO_RECORD))
 
     def step(self):
         """Run one step of the model. """
-        goals_before = self.goals_scored
-        shots_before = self.shots
+        assert self.has_run_been_setup()
         self.schedule.step()
         self.collect_data_if_is_time()
-        if self.shots > shots_before:
-            self.puck.prob_of_goal = 0.0
-        if self.goals_scored > goals_before:
-            print("[half-rink] Goal scored! (now %d in total). Resetting positions of agents" % (self.goals_scored))
-            self.reset_agents()
         self.update_running_flag()
 
     def vector_to_puck(self, a_pos: Point) -> Vec2d:
@@ -304,64 +263,7 @@ class HockeyHalfRink(Model):
         """
         return looking_at.angle_to(self.vector_to_puck(a_pos))
 
-    def vectors_to_goal(self, a_pos: Point) -> Tuple[Vec2d, Vec2d]:
-        return (Vec2d.from_to(from_pt=a_pos, to_pt=self.GOALIE_POST_1),
-                Vec2d.from_to(from_pt=a_pos, to_pt=self.GOALIE_POST_2))
-
-    def angles_to_goal(self, a_pos: Point, looking_at: Vec2d) -> Tuple[AngleInRadians, AngleInRadians]:
-        """
-        Angle to puck, defined in [0, 2Pi]. If puck is at the right of the vector
-        defined by a straight line right in front of me, then this angle will be in [Pi, 2Pi]
-        If it's at my left, the angle is in [0,Pi]
-        """
-        v1, v2 = self.vectors_to_goal(a_pos)
-        return (looking_at.angle_to(v1), looking_at.angle_to(v2))
-
-    def min_angle_to_goal(self, a_pos: Point, looking_at: Vec2d) -> AngleInRadians:
-        """
-        Angle to puck, defined in [0, 2Pi]. If puck is at the right of the vector
-        defined by a straight line right in front of me, then this angle will be in [Pi, 2Pi]
-        If it's at my left, the angle is in [0,Pi]
-        """
-        return min(self.angles_to_goal(a_pos, looking_at))
-
-    def first_visible_goal_point_from(self, a_position: Point) -> Optional[Point]:
-        """From a certain position, can I see the goal?"""
-
-        x, y = a_position
-        # do I see _any_ part of the goal?
-        goal_x = self.goal_position[0]
-        if x > goal_x:
-            # if I am behind the goal, I can't see any of its points
-            return None
-        y_in_goal = self.goal_position[1][0] - 1
-        found_clear_path = False
-        while (not found_clear_path) and (y_in_goal < self.goal_position[1][1]):
-            y_in_goal += 1
-            #
-            cells_on_way = cells_between(a_position.as_tuple(), (goal_x, y_in_goal))
-            # let's visit all cells to see if it's free
-            free_path = True
-            idx_cell_in_way = -1
-            max_idx_cells_in_way = len(cells_on_way) - 1
-            while free_path and idx_cell_in_way < max_idx_cells_in_way:
-                idx_cell_in_way += 1
-                x_in_way, y_in_way = cells_on_way[idx_cell_in_way]
-                free_path = True # TODO. Was (in discrete space): self.grid.is_cell_empty(pos=(x_in_way, y_in_way))
-            found_clear_path = free_path
-        if found_clear_path:
-            return Point(goal_x, y_in_goal)
-        else:
-            return None
-
-    def clear_path_to_goal_from(self, a_position: Point) -> bool:
-        """From a certain position, can I see the goal?"""
-        return not (self.first_visible_goal_point_from(a_position) is None)
-
-
 if __name__ == "__main__":
-    hockey_rink = HockeyHalfRink(how_many_offense=5, how_many_defense=5)
+    hockey_rink = SkatingIce(width=10, height=3, how_many_offense=5, how_many_defense=5)
     d = Defense(hockey_world_model=hockey_rink, brain=RuleBasedBrain())
-    print(d)
-    # while True:
-    #     hockey_rink.step()
+    print(hockey_rink)

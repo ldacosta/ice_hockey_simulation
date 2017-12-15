@@ -1,14 +1,14 @@
+import math
 import unittest
 from copy import copy
 from random import sample as randomsample
-import math
 
-from geometry.vector import Vec2d, X_UNIT_VECTOR, Y_UNIT_VECTOR
-from geometry.point import Point
 from geometry.angle import AngleInRadians
-from hockey.core.half_rink import HockeyHalfRink
-from hockey.behaviour.core.action import HockeyAction
-from hockey.core.player.base import Player
+from geometry.point import Point
+from geometry.vector import Vec2d, X_UNIT_VECTOR, Y_UNIT_VECTOR
+
+from hockey.core.ice_surface.half_rink import HockeyHalfRink
+
 
 class TestBasePlayer(unittest.TestCase):
     """Testing definitions of a player."""
