@@ -14,6 +14,7 @@ from typing import Optional
 from hockey.behaviour.core.hockey_scenario import GrabThePuckProblem
 from hockey.core.folder_manager import FolderManager
 from hockey.core.ice_surface.half_rink import HockeyHalfRink
+from hockey.core.ice_surface.no_obstacles import Ice5x5 as NoObstacles5x5
 from hockey.core.model import TIME_PER_FRAME
 from hockey.core.simulator import MesaModelSimulator, ScenarioSimulator
 from hockey.visualization.pygame.global_def import HALF_ICE_WIDTH, HALF_ICE_HEIGHT
@@ -110,57 +111,18 @@ def main(argv):
             raise RuntimeError("[mode = visualization] input directory must be specified")
 
     # field
-    hockey_rink = HockeyHalfRink(
-        width=HockeyHalfRink.WIDTH_HALF_ICE,
-        height=HockeyHalfRink.HEIGHT_ICE,
-        how_many_offense=1,
-        how_many_defense=0)
+    hockey_rink = NoObstacles5x5(how_many_offense=1, how_many_defense=0)
     if mode_simulation:
         hockey_rink.setup_run(
             one_step_in_seconds=TIME_PER_FRAME,
             collect_data_every_secs=DATA_EVERY_SECS,
             record_this_many_minutes=RECORD_THIS_MANY_MINUTES)
         folder_manager.makedirs()
-        # let's choose the name of the files were the data will be saved:
-        # model
-        print("************************** Choosing file name where to save model...")
-        num_model_file = 1
-        full_model_file_name = folder_manager.model_file_name(run_number=num_model_file, full=True)
-        print("Trying '%s'..." % (full_model_file_name))
-        # max_tick = 0
-        max_step = 0
-        max_goals = 0
-        max_shots = 0
-        max_timestamp = 0
-        while os.path.exists(full_model_file_name):
-            # update max's
-            model_df = pd.read_csv(full_model_file_name)
-            print(list(model_df.columns.values))
-            # max_tick = max(max_tick, model_df["Unnamed: 0"].max())
-            max_step = max(max_step, model_df["steps"].max())
-            max_goals = max(max_goals, model_df["goals"].max())
-            max_shots = max(max_shots, model_df["shots"].max())
-            max_timestamp = max(max_timestamp, model_df["timestamp"].max())
-            print("Updating max_steps to %d, max_goals to %d, max_shots to %d, max_timestamp to %.2f" % (max_step, max_goals, max_shots, max_timestamp))
-            # new file to search
-            num_model_file += 1
-            full_model_file_name = folder_manager.model_file_name(run_number=num_model_file, full=True)
-            print("Trying '%s'..." % (full_model_file_name))
-        print("[Model file] Chosen '%s'" % (full_model_file_name))
-        # agents
-        print("************************** Choosing file name where to save agents...")
-        num_agents_file = 1
-        full_agents_file_name = folder_manager.agents_file_name(run_number=num_agents_file, full=True)
-        print("Trying '%s'..." % (full_agents_file_name))
-        while os.path.exists(full_agents_file_name):
-            num_agents_file += 1
-            full_agents_file_name = folder_manager.agents_file_name(run_number=num_agents_file, full=True)
-            print("Trying '%s'..." % (full_agents_file_name))
-        print("[Agents file] Chosen '%s'\n" % (full_agents_file_name))
         print("Will record %d minutes of simulated action, snapshots every %.2f seconds; reporting will be done in these dirs:\n%s"
               % (RECORD_THIS_MANY_MINUTES, DATA_EVERY_SECS, folder_manager.directories2str()))
         mesa_simulator = MesaModelSimulator(mesa_model=hockey_rink)
         hockey_problem = GrabThePuckProblem(hockey_world=hockey_rink)
+        hockey_problem.reset()
 
         # where am I going to save to?
         brain_dir = folder_manager.brain_dir
@@ -175,46 +137,7 @@ def main(argv):
 
         xcs_simulator.run_until_done() # run()
         #
-        model_df = hockey_rink.datacollector.get_model_vars_dataframe()
-        model_df["goals"] += max_goals
-        model_df["shots"] += max_shots
-        model_df["steps"] += max_step
-        model_df["timestamp"] += max_timestamp
-
-        agents_df = hockey_rink.datacollector.get_agent_vars_dataframe()
-        print(list(agents_df.columns.values))
-        agents_df["timestamp"] += max_timestamp
-
-        model_df.to_csv(full_model_file_name)
-        agents_df.to_csv(full_agents_file_name)
-
-        # timestamp_reached = 0
-        # while timestamp_reached < RECORD_THIS_MANY_MINUTES * 60:
-        #     print("**************** RESTART **********************; I am on timestamp %d, going to %d" % (timestamp_reached, RECORD_THIS_MANY_MINUTES * 60))
-        #     hockey_problem.reset()
-        #     xcs_simulator.run()
-        #     #
-        #     model_df = hockey_rink.datacollector.get_model_vars_dataframe()
-        #     timestamp_reached += model_df["timestamp"].max()
-        #     model_df["goals"] += max_goals
-        #     model_df["shots"] += max_shots
-        #     model_df["steps"] += max_step
-        #     model_df["timestamp"] += max_timestamp
-        #
-        #     agents_df = hockey_rink.datacollector.get_agent_vars_dataframe()
-        #     print(list(agents_df.columns.values))
-        #     agents_df["timestamp"] += max_timestamp
-        #
-        #     model_df.to_csv(full_model_file_name)
-        #     agents_df.to_csv(full_agents_file_name)
-        #
-        #     # now update the 'max's
-        #
-        #     max_step = model_df["steps"].max()
-        #     max_goals = model_df["goals"].max()
-        #     max_shots = model_df["shots"].max()
-        #     max_timestamp = model_df["timestamp"].max()
-        #     print("Episode finished => I am on timestamp %d, going to %d" % (timestamp_reached, RECORD_THIS_MANY_MINUTES * 60))
+        hockey_rink.save_activity(folder_manager)
     else:
         if not os.path.exists(input_directory):
             raise RuntimeError("Directory [%s] does not exist" % (input_directory))
