@@ -4,10 +4,10 @@
 """
 
 import sys
-from hockey.visualization.pygame.animate_particles_on_ice import animate
-from hockey.core.ice_surface.no_obstacles import Ice5x5 as NoObstacles5x5
-from hockey.behaviour.core.hockey_scenario import GrabThePuckProblem
 
+from hockey.behaviour.core.hockey_scenario import GrabThePuckProblem
+from hockey.core.animation.animate_particles_on_ice import animate
+from hockey.core.ice_surface.no_obstacles import Ice5x5 as NoObstacles5x5
 
 if __name__ == "__main__":
     ice_environment = NoObstacles5x5(how_many_offense=1, how_many_defense=0)
