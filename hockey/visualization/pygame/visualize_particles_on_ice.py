@@ -38,11 +38,11 @@ def newest_brain_in_dir(directory: str) -> Optional[str]:
 def main(argv):
     def show_options():
         print("To run experience, do:")
-        print("> animate_hockey_game.py -d <experiments_root_dir> -e <experiment_name> -s <save_every_seconds> -r <record_in_minutes>")
+        print("> animate_particles_on_ice.py -d <experiments_root_dir> -e <experiment_name> -s <save_every_seconds> -r <record_in_minutes>")
         print("if <save_every_seconds> == -1 => 'record ALL steps of simulation' (warning: memory is cheap, not infinite)")
         #
         print("To display results of experience, do:")
-        print("> animate_hockey_game.py -a <speedup> -i <input_file_name>")
+        print("> animate_particles_on_ice.py -a <speedup> -i <input_file_name>")
     #
     DATA_EVERY_SECS = float("inf")
     RECORD_THIS_MANY_MINUTES = 0
