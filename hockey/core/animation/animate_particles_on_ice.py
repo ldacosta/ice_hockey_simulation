@@ -1,29 +1,12 @@
 import getopt
-import os
 import sys
 
-import pandas as pd
-from typing import Optional
-
-from util.base import find_newest_file_in_dir
 from hockey.behaviour.core.hockey_scenario import LearnToPlayHockeyProblem
 from hockey.core.folder_manager import FolderManager
+from hockey.core.ice_surface.ice_rink import SkatingIce
 from hockey.core.model import TIME_PER_FRAME
 from hockey.core.simulator import ScenarioSimulator
-from hockey.core.ice_surface.ice_rink import SkatingIce
 
-
-def read_and_merge_dataframes(input_directory, prefix_fname: str, verbose: bool = False) -> pd.DataFrame:
-    all_fnames = [os.path.join(input_directory, fname)
-                        for fname in os.listdir(input_directory) if fname.startswith(prefix_fname) and fname.endswith(".pd")]
-    if verbose:
-        print("From '%s' I read %s" % (input_directory, all_fnames))
-    return pd.concat(list(map(pd.read_csv, all_fnames)), ignore_index=True)
-
-
-def newest_brain_in_dir(directory: str) -> Optional[str]:
-    """Gets newest brain in a folder - None is there is nothing there or the directory doesn't exist."""
-    return find_newest_file_in_dir(directory, file_pattern='*.bin')
 
 def show_options():
     print("To run experience, do:")

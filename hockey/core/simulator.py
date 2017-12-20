@@ -108,7 +108,7 @@ class ScenarioSimulator(Simulator):
             show_good_rules(model)
         print("Loading/Creation Done")
 
-        model.algorithm.exploration_probability = 1e-5 # .01 # .25
+        model.algorithm.exploration_probability = .1 # .25
         model.algorithm.crossover_probability = .25
         model.algorithm.do_action_set_subsumption = True
         model.algorithm.idealization_factor = 1
