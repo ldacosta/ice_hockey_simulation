@@ -16,7 +16,7 @@ class PuckPygameRenderable(Renderable):
             rects=[],
             circles=[
                 DrawingCircle(
-                    center=self.converter.world_pt_2_screen (self.puck.pos).as_tuple(),
+                    center=self.converter.world_pt_2_screen(self.puck.pos).as_tuple(),
                     radius=self.converter.length_on_screen(self.puck.radius),
                     color=Color.WHITE,
                     line_thickness=2),

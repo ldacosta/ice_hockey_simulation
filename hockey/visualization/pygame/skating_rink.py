@@ -26,21 +26,17 @@ class SkatingRinklPygameRenderable(Renderable):
 
     def representation(self) -> DrawingObjects:
         cells_in_sc = []
-        for idx_x in range(0, self.ice_rink.width):
-            for idx_y in range(1, self.ice_rink.height + 1):
-                left_in_sc, top_in_sc = self.converter.world_tuple_2_screen(idx_x, idx_y)
-                cells_in_sc.append(DrawingRect(top=top_in_sc,
-                          left=left_in_sc,
+        # we are making squares of side 1
+        for x_in_world in range(0, self.ice_rink.width):
+            for y_in_world in range(1, self.ice_rink.height + 1):
+                x_in_sc, y_in_sc = self.converter.world_tuple_2_screen(x_in_world - 0.5, y_in_world - 0.5)
+                cells_in_sc.append(DrawingRect(top=y_in_sc,
+                          left=x_in_sc,
                           width=self.converter.length_on_screen(1),
                           height=self.converter.length_on_screen(1),
                           color=Color.TOMATO,
                           lines_thickness=3))
-        rink = DrawingObjects(
-                rects=cells_in_sc,
-                circles=[
-                ],
-                lines=[
-                ])
+        rink = DrawingObjects(rects=cells_in_sc, circles=[], lines=[])
         puck = PuckPygameRenderable(puck=self.ice_rink.puck, w2c_converter=self.converter).representation()
         all_defense_players = reduce(
             lambda repr1, repr2: repr1 + repr2,

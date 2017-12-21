@@ -8,8 +8,8 @@ from hockey.visualization.pygame.world_to_canvas import World2CanvasConverter
 class PlayerPygameRenderable(Renderable):
 
     def __init__(self, player: Player, w2c_converter: World2CanvasConverter):
-        self.player = player
         super().__init__()
+        self.player = player
         self.converter = w2c_converter
 
     def representation(self) -> DrawingObjects:
