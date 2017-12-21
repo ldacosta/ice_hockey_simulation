@@ -13,16 +13,16 @@ class PuckPygameRenderable(Renderable):
 
     def representation(self) -> DrawingObjects:
         # screen cooordinates:
-        top_in_wc = 0
-        top_in_sc = self.converter.y_on_screen(top_in_wc)
-        left_in_wc = 0
-        left_in_sc = self.converter.x_on_screen(left_in_wc)
+        # top_in_wc = 0
+        # top_in_sc = self.converter.y_on_screen(top_in_wc)
+        # left_in_wc = 0
+        # left_in_sc = self.converter.length_on_screen(left_in_wc)
         rink = DrawingObjects(
             rects=[],
             circles=[
                 DrawingCircle(
-                    center=(self.converter.x_on_screen(self.puck.pos[0]), self.converter.y_on_screen(self.puck.pos[1])),
-                    radius=self.converter.x_on_screen(self.puck.radius),
+                    center=self.converter.world_pt_2_screen (self.puck.pos).as_tuple(),
+                    radius=self.converter.length_on_screen(self.puck.radius),
                     color=Color.WHITE,
                     line_thickness=2),
             ],

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Conversion of wrold 2 canvas.
+"""Conversion of world 2 canvas.
 
 TODO:
 
@@ -67,7 +67,13 @@ class World2CanvasConverter(object):
         self.transformation_matrix[1][2] = self.screen_height
         self.transformation_matrix[2][2] = 1
 
-    def world_2_screen(self, pt_world: Point) -> Point:
+
+    def world_tuple_2_screen(self, x: float, y: float) -> Tuple[float, float]:
+        "Transforms a tuple (representing a point) in world to a point in screen."
+        return self.world_pt_2_screen(pt_world=Point(x,y)).as_tuple()
+
+    def world_pt_2_screen(self, pt_world: Point) -> Point:
+        "Transforms a point in world to a point in screen."
         pt = np.ones((3, 1))
         pt[0] = pt_world.x
         pt[1] = pt_world.y
@@ -78,13 +84,13 @@ class World2CanvasConverter(object):
         return "World:  width = %.2f, height = %.2f\n" % (self.world_width, self.world_height) + \
                "Screen: width = %.2f, height = %.2f" % (self.screen_width, self.screen_height)
 
-    def x_on_screen(self, x_wc: float) -> float:
-        return self.X_MARGIN/2 + normalize_to(a_value=x_wc,
-                                                        new_min=0.0, new_max=self.screen_width,
-                                                        old_min=0.0, old_max=self.world_width)
-
-
-    def y_on_screen(self, y_wc: float) -> float:
-        return self.Y_MARGIN/2 + normalize_to(a_value=y_wc,
-                                                        new_min=0.0, new_max=self.screen_height,
-                                                        old_min=0.0, old_max=self.world_height)
+    def length_on_screen(self, length_on_world: float) -> float:
+        "Given a lenght on world returns the length on the screen."
+        world_pt = Point(length_on_world, length_on_world)
+        result = self.world_pt_2_screen(world_pt)
+        world_orig_on_screen = self.world_pt_2_screen(Point(0, 0))
+        screen_dist_x = abs(result.x - world_orig_on_screen.x)
+        screen_dist_y = abs(result.y - world_orig_on_screen.y)
+        msg = "[Distance on world is %.2f] Screen distance is %.2f in X, %.2f in Y" % (length_on_world, screen_dist_x, screen_dist_y)
+        assert screen_dist_x == screen_dist_y, msg # TODO: get rid of this sanity check once everything is stable.
+        return screen_dist_x
