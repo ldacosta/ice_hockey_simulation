@@ -26,11 +26,11 @@ class TestWorld2Canvas(unittest.TestCase):
         world_origin = Point(0, 0)
         result = self.transformer.world_pt_2_screen(world_origin)
         self.assertAlmostEqual(result.x, 0)
-        self.assertAlmostEqual(result.y, self.transformer.screen_height)
+        self.assertAlmostEqual(result.y, self.transformer.canvas_height)
         # bottom left
         world_bottom_left = Point(self.transformer.world_width, self.transformer.world_height)
         result = self.transformer.world_pt_2_screen(world_bottom_left)
-        self.assertAlmostEqual(result.x, self.transformer.screen_width)
+        self.assertAlmostEqual(result.x, self.transformer.canvas_width)
         self.assertAlmostEqual(result.y, 0)
 
     def test_belonging_of_transformed(self):
@@ -41,8 +41,8 @@ class TestWorld2Canvas(unittest.TestCase):
             world_pt = Point(world_x, world_y)
             result = self.transformer.world_pt_2_screen(world_pt)
             msg = "World pt %s got converted into screen point %s" % (world_pt, result)
-            self.assertTrue(result.x >= 0 and result.x <= self.transformer.screen_width, msg)
-            self.assertTrue(result.y >= 0 and result.y <= self.transformer.screen_height, msg)
+            self.assertTrue(result.x >= 0 and result.x <= self.transformer.canvas_width, msg)
+            self.assertTrue(result.y >= 0 and result.y <= self.transformer.canvas_height, msg)
 
     def test_homogeneous_coordinates(self):
         "Points with same coordinates should stay that way."

@@ -18,26 +18,17 @@ from hockey.visualization.pygame.world_to_canvas import World2CanvasConverter
 
 class SkatingRinklPygameRenderable(Renderable):
 
-    X_MARGINS_WC = 10 # total margins on X, in world coordinates
-    Y_MARGINS_WC = 10 # total margins on Y, in world coordinates
-
     def __init__(self, ice_rink: SkatingIce):
-        self.ice_rink = ice_rink
         super().__init__()
+        self.ice_rink = ice_rink
         self.converter = World2CanvasConverter(
-            world_width=self.ice_rink.width + self.X_MARGINS_WC, world_height=self.ice_rink.height + self.Y_MARGINS_WC)
+            world_width=self.ice_rink.width, world_height=self.ice_rink.height, window_border=(10, 10))
 
     def representation(self) -> DrawingObjects:
-        top_in_wc = 0 # self.Y_MARGINS_WC/2
-        # top_in_sc = self.converter.y_on_screen(top_in_wc)
-        left_in_wc = 0 # self.X_MARGINS_WC/2
-        # left_in_sc = self.converter.length_on_screen(left_in_wc)
-        # right_in_sc = self.converter.length_on_screen(left_in_wc + self.ice_rink.width)
-        # bottom_in_sc = self.converter.y_on_screen(top_in_wc + self.ice_rink.height)
         cells_in_sc = []
         for idx_x in range(0, self.ice_rink.width):
-            for idx_y in range(0, self.ice_rink.height):
-                left_in_sc, top_in_sc = self.converter.world_tuple_2_screen(left_in_wc + idx_x, top_in_wc + idx_y)
+            for idx_y in range(1, self.ice_rink.height + 1):
+                left_in_sc, top_in_sc = self.converter.world_tuple_2_screen(idx_x, idx_y)
                 cells_in_sc.append(DrawingRect(top=top_in_sc,
                           left=left_in_sc,
                           width=self.converter.length_on_screen(1),

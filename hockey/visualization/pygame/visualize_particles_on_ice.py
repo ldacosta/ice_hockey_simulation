@@ -78,7 +78,7 @@ def visualize(argv, ice_environment: SkatingIce, renderable_ice: Renderable):
 
     # Let's get ready to display:
     pygame.display.set_caption("Hockey Monster!!!!!")
-    surface = pygame.display.set_mode((HALF_ICE_WIDTH, HALF_ICE_HEIGHT), 0, 32)
+    surface = pygame.display.set_mode((renderable_ice.converter.screen_width, renderable_ice.converter.screen_height), 0, 32)
     surface.fill(THECOLORS['black'])
 
     total_time_between_frames_in_ms = (DATA_EVERY_SECS * 1000) / speedup
@@ -91,8 +91,6 @@ def visualize(argv, ice_environment: SkatingIce, renderable_ice: Renderable):
     clock = pygame.time.Clock()
     old_minutes_in_simulation = -1
     for curr_timestamp in list(model_df['timestamp']):
-    # for i in range(0, num_steps):
-        # df_step = agents_df.loc[agents_df['Step'] == i]
         df_step = agents_df.loc[agents_df['timestamp'] == curr_timestamp]
         defenses_seen = 0
         attackers_seen = 0
@@ -106,20 +104,10 @@ def visualize(argv, ice_environment: SkatingIce, renderable_ice: Renderable):
             if agent_id.startswith("defense"):
                 ice_environment.defense[defenses_seen].pos = the_pos
                 ice_environment.defense[defenses_seen].__set_gaze_and_speed_from__(an_angle_opt=speed_angle, a_speed_opt=speed_amplitude)
-                # hockey_rink.defense[defenses_seen].angle_looking_at = speed_angle
-                # hockey_rink.defense[defenses_seen].current_speed = speed_amplitude
-                # hockey_rink.defense[defenses_seen].speed = hockey_rink.defense[defenses_seen].speed_on_xy()
                 defenses_seen += 1
             elif agent_id.startswith("forward"):
-                try:
-                    ice_environment.attack[attackers_seen].pos = the_pos
-                except Exception as e:
-                    print("Exception of timestamp %d: %s" % (curr_timestamp, e))
-                    print("attackers_seen = %d, len(hockey_rink.attack) = %d" % (attackers_seen, len(ice_environment.attack)))
+                ice_environment.attack[attackers_seen].pos = the_pos
                 ice_environment.attack[defenses_seen].__set_gaze_and_speed_from__(an_angle_opt=speed_angle, a_speed_opt=speed_amplitude)
-                # hockey_rink.attack[attackers_seen].angle_looking_at = speed_angle
-                # hockey_rink.attack[attackers_seen].current_speed = speed_amplitude
-                # hockey_rink.attack[attackers_seen].speed = hockey_rink.attack[attackers_seen].speed_on_xy()
                 attackers_seen += 1
             elif agent_id.startswith("puck"):
                 ice_environment.puck.pos = the_pos
@@ -128,7 +116,7 @@ def visualize(argv, ice_environment: SkatingIce, renderable_ice: Renderable):
         # seconds_in_simulation = DATA_EVERY_SECS * i
         seconds_in_simulation = curr_timestamp
         minutes_in_simulation = seconds_in_simulation // 60
-        if False: # minutes_in_simulation > old_minutes_in_simulation:
+        if minutes_in_simulation > old_minutes_in_simulation:
             print("[%s] Minute %d of simulation" % (time.ctime(), minutes_in_simulation))
             old_minutes_in_simulation = minutes_in_simulation
         tick_time = clock.tick(FPS)

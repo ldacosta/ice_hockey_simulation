@@ -143,12 +143,12 @@ class Player(ObjectOnIce, Sensor):
             return False
 
     def __init__(self, prefix_on_id: str, hockey_world_model, brain: Brain):
-        ObjectOnIce.__init__(self, prefix_on_id, hockey_world_model,
-                         size=3, # feet
-                         pos_opt=None)
         Sensor.__init__(self, environment=hockey_world_model)
         self.height = random_between(Player.MIN_HEIGHT, Player.MAX_HEIGHT)
         self.reach = 1 # TODO # stick_length_for_height(self.height * INCHES_IN_FOOT) / INCHES_IN_FOOT + (self.height / 2) # in feet
+        ObjectOnIce.__init__(self, prefix_on_id, hockey_world_model,
+                         size=self.reach,
+                         pos_opt=None)
         self.moving_speed = random_between(Player.MIN_SPEED_MOVING, Player.MAX_SPEED_MOVING)
         self.sprinting_speed = random_between(Player.MIN_SPEED_SPRINTING, Player.MAX_SPEED_SPRINTING)
         self.power = random_between(Player.MIN_POWER, Player.MAX_POWER)
