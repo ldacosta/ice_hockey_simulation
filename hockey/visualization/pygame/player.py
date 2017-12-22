@@ -8,8 +8,8 @@ from hockey.visualization.pygame.world_to_canvas import World2CanvasConverter
 class PlayerPygameRenderable(Renderable):
 
     def __init__(self, player: Player, w2c_converter: World2CanvasConverter):
-        self.player = player
         super().__init__()
+        self.player = player
         self.converter = w2c_converter
 
     def representation(self) -> DrawingObjects:
@@ -24,14 +24,14 @@ class PlayerPygameRenderable(Renderable):
             rects=[],
             circles=[ # actual position
                 DrawingCircle(
-                    center=(self.converter.x_on_screen(self.player.pos[0]), self.converter.y_on_screen(self.player.pos[1])),
-                    radius=self.converter.x_on_screen(self.player.size/2),
+                    center=self.converter.world_pt_2_screen(self.player.pos).as_tuple(),
+                    radius=self.converter.length_on_screen(self.player.size / 2),
                     color=color,
                     line_thickness=2),
             ],
             lines=[ # direction
                 DrawingLine(
-                    begin=(self.converter.x_on_screen(self.player.pos[0]), self.converter.y_on_screen(self.player.pos[1])),
-                    end=(self.converter.x_on_screen(end_of_speed_vector[0]), self.converter.y_on_screen(end_of_speed_vector[1])),
+                    begin=self.converter.world_pt_2_screen(self.player.pos).as_tuple(),
+                    end=self.converter.world_tuple_2_screen(end_of_speed_vector.x, end_of_speed_vector.y),
                     color=color,
                     thickness=6)])

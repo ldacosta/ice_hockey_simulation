@@ -2,6 +2,8 @@ import random
 import numpy as np
 import glob
 import os
+
+import pandas as pd
 from typing import List, Optional
 
 # How many feet in 1 meter?
@@ -92,3 +94,11 @@ def stick_length_for_height(height_in_inches: float) -> float:
     a = 2 / 7
     b = 17.29
     return a * height_in_inches + b
+
+
+def read_and_merge_dataframes(input_directory, prefix_fname: str, verbose: bool = False) -> pd.DataFrame:
+    all_fnames = [os.path.join(input_directory, fname)
+                        for fname in os.listdir(input_directory) if fname.startswith(prefix_fname) and fname.endswith(".pd")]
+    if verbose:
+        print("From '%s' I read %s" % (input_directory, all_fnames))
+    return pd.concat(list(map(pd.read_csv, all_fnames)), ignore_index=True)

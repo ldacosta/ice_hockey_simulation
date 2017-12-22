@@ -1,5 +1,6 @@
 from functools import reduce
 
+from geometry.point import Point
 from rendering.base import Color
 from rendering.pygame.base import DrawingObjects, DrawingRect, DrawingCircle, DrawingLine, Renderable
 
@@ -23,11 +24,18 @@ class HalfRinklPygameRenderable(Renderable):
     def representation(self) -> DrawingObjects:
         # screen cooordinates:
         top_in_wc = 0 # self.Y_MARGINS_WC/2
-        top_in_sc = self.converter.y_on_screen(top_in_wc)
+        bottom_in_wc = top_in_wc + self.half_rink.height
+        # top_in_sc = self.converter.y_on_screen(top_in_wc)
         left_in_wc = 0 # self.X_MARGINS_WC/2
-        left_in_sc = self.converter.x_on_screen(left_in_wc)
-        right_in_sc = self.converter.x_on_screen(left_in_wc + self.half_rink.width)
-        bottom_in_sc = self.converter.y_on_screen(top_in_wc + self.half_rink.height)
+        right_in_wc = left_in_wc + self.half_rink.width
+        # left_in_sc = self.converter.length_on_screen(left_in_wc)
+        # right_in_sc = self.converter.length_on_screen(left_in_wc + self.half_rink.width)
+        # bottom_in_sc = self.converter.y_on_screen(top_in_wc + self.half_rink.height)
+
+
+        left_in_sc, top_in_sc = self.converter.world_pt_2_screen(Point(top_in_wc, left_in_wc))
+        right_in_sc, bottom_in_sc = self.converter.world_pt_2_screen(Point(right_in_wc, bottom_in_wc))
+
         rink = DrawingObjects(
                 rects=[
                 DrawingRect(top=top_in_sc,
@@ -39,61 +47,74 @@ class HalfRinklPygameRenderable(Renderable):
                 circles=[
                     # half-circle of half of the rink
                     DrawingCircle(
-                        center=(left_in_sc, self.converter.y_on_screen(top_in_wc + self.half_rink.HEIGHT_ICE/2)),
-                        radius=self.converter.x_on_screen(15),
+                        center=self.converter.world_tuple_2_screen(
+                            left_in_wc,
+                                  top_in_wc + self.half_rink.height/2),
+                        radius=self.converter.length_on_screen(15),
                         color=Color.WHITE,
                         line_thickness=2),
                     # faceoff circles
                     # neutral zone
                     DrawingCircle(
-                        center=(
-                        self.converter.x_on_screen(left_in_wc + self.half_rink.NEUTRAL_FACEOFF_X), self.converter.y_on_screen(top_in_wc + self.half_rink.FACEOFF_TOP_Y)),
-                        radius=self.converter.x_on_screen(15),
+                        center=self.converter.world_pt_2_screen(
+                            Point(left_in_wc + self.half_rink.NEUTRAL_FACEOFF_X,
+                                  top_in_wc + self.half_rink.FACEOFF_TOP_Y).as_tuple()).as_tuple(),
+                        radius=self.converter.length_on_screen(15),
                         color=Color.WHITE,
                         line_thickness=2),
                     DrawingCircle(
                         center=(
-                        self.converter.x_on_screen(left_in_wc + self.half_rink.NEUTRAL_FACEOFF_X), self.converter.y_on_screen(top_in_wc + self.half_rink.FACEOFF_BOTTOM_Y)),
-                        radius=self.converter.x_on_screen(15),
+                            self.converter.world_pt_2_screen(Point(left_in_wc + self.half_rink.NEUTRAL_FACEOFF_X,
+                                                                   top_in_wc + self.half_rink.FACEOFF_BOTTOM_Y).as_tuple()).as_tuple()),
+                        radius=self.converter.length_on_screen(15),
                         color=Color.WHITE,
                         line_thickness=2),
                     # offensive zone
                     DrawingCircle(
-                        center=(
-                        self.converter.x_on_screen(left_in_wc + self.half_rink.OFF_FACEOFF_X), self.converter.y_on_screen(top_in_wc + self.half_rink.FACEOFF_TOP_Y)),
-                        radius=self.converter.x_on_screen(15),
+                        center=self.converter.world_pt_2_screen(
+                            Point(left_in_wc + self.half_rink.OFF_FACEOFF_X,
+                                  top_in_wc + self.half_rink.FACEOFF_TOP_Y).as_tuple()).as_tuple(),
+                        radius=self.converter.length_on_screen(15),
                         color=Color.WHITE,
                         line_thickness=2),
                     DrawingCircle(
-                        center=(
-                            self.converter.x_on_screen(left_in_wc + self.half_rink.OFF_FACEOFF_X),
-                            self.converter.y_on_screen(top_in_wc + self.half_rink.FACEOFF_BOTTOM_Y)),
-                        radius=self.converter.x_on_screen(15),
+                        center=self.converter.world_pt_2_screen(
+                            Point(left_in_wc + self.half_rink.OFF_FACEOFF_X,
+                                  top_in_wc + self.half_rink.FACEOFF_BOTTOM_Y).as_tuple()).as_tuple(),
+                        radius=self.converter.length_on_screen(15),
                         color=Color.WHITE,
                         line_thickness=2),
                 ],
                 lines=[
                     # half of the rink
                     DrawingLine(
-                        begin=(left_in_sc, top_in_sc),
-                        end=(left_in_sc, top_in_sc + self.converter.y_on_screen(self.half_rink.height)),
+                        begin=self.converter.world_tuple_2_screen(left_in_wc, top_in_wc),
+                        end=self.converter.world_tuple_2_screen(left_in_wc, top_in_wc + self.half_rink.height),
                         color=Color.RED,
                         thickness=2),
                     # blue line
                     DrawingLine(
-                        begin=(left_in_sc + self.converter.x_on_screen(self.half_rink.BLUE_LINE_X), top_in_sc),
-                        end=(left_in_sc + self.converter.x_on_screen(self.half_rink.BLUE_LINE_X), top_in_sc + self.converter.y_on_screen(self.half_rink.height)),
+                        begin=self.converter.world_tuple_2_screen(left_in_wc + self.half_rink.BLUE_LINE_X, top_in_wc),
+                        end=self.converter.world_tuple_2_screen(
+                            left_in_wc + self.half_rink.BLUE_LINE_X,
+                            top_in_wc + self.half_rink.height),
                         color=Color.BLUE,
                         thickness=2),
                     # goal
                     DrawingLine(
-                        begin=(left_in_sc + self.converter.x_on_screen(self.half_rink.goal_position[0]), top_in_sc),
-                        end=(left_in_sc + self.converter.x_on_screen(self.half_rink.goal_position[0]), bottom_in_sc),
+                        begin=self.converter.world_tuple_2_screen(left_in_wc + self.half_rink.goal_position[0], top_in_wc),
+                        end=self.converter.world_tuple_2_screen(
+                            left_in_wc + self.half_rink.goal_position[0],
+                            bottom_in_wc),
                         color=Color.TOMATO,
                         thickness=1),
                     DrawingLine(
-                        begin=(left_in_sc + self.converter.x_on_screen(self.half_rink.goal_position[0]), top_in_sc + self.converter.y_on_screen(self.half_rink.goal_position[1][0])),
-                        end=(left_in_sc + self.converter.x_on_screen(self.half_rink.goal_position[0]), top_in_sc + self.converter.y_on_screen(self.half_rink.goal_position[1][1])),
+                        begin=self.converter.world_tuple_2_screen(
+                            left_in_wc + self.half_rink.goal_position[0],
+                            top_in_wc + self.half_rink.goal_position[1][0]),
+                        end=self.converter.world_tuple_2_screen(
+                            left_in_wc + self.half_rink.goal_position[0],
+                            top_in_wc + self.half_rink.goal_position[1][1]),
                         color=Color.RED,
                         thickness=3),
                 ])
