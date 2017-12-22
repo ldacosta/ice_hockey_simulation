@@ -131,8 +131,3 @@ def visualize(argv, ice_environment: SkatingIce, renderable_ice: Renderable):
 
         pygame_render(renderable_ice.representation(), surface)
         pygame.display.update()
-
-if __name__ == "__main__":
-    skating_ice = IceNxN(width=10, height=10, how_many_offense=1, how_many_defense=0)
-    rendr = SkatingRinklPygameRenderable(ice_rink=skating_ice)
-    visualize(sys.argv[1:], ice_environment = skating_ice, renderable_ice=rendr)
