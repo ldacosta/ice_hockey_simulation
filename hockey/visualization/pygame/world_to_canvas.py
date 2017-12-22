@@ -75,58 +75,10 @@ class World2CanvasConverter(object):
         b = self.canvas_height / self.world_height
         self.transformation_matrix = np.zeros((3,3))
         self.transformation_matrix[0][0] = a
-        self.transformation_matrix[0][2] = window_width_border + -a * self.x_min # TODO: put window_width_border
+        self.transformation_matrix[0][2] = window_width_border + -a * self.x_min
         self.transformation_matrix[1][1] = -b
         self.transformation_matrix[1][2] = window_height_border + b * self.y_max
         self.transformation_matrix[2][2] = 1
-
-
-    # def __init__(self,
-    #              world_width: float, world_height: float,
-    #              window_width_border: Optional[float] = 0,
-    #              window_height_border: Optional[float] = 0,
-    #              proposed_canvas_height_opt: Optional[float] = None, proposed_canvas_width_opt: Optional[float] = None):
-    #     (max_window_width, max_window_height) = World2CanvasConverter.screen_width_height()
-    #     max_canvas_width = max_window_width - 2 * (window_width_border or 0)
-    #     max_canvas_height = max_window_height - 2 * (window_height_border or 0)
-    #     print("[MAX window] width = %d, height = %d => MAX canvas:  width = %d, height = %d" % (max_window_width, max_window_height, max_canvas_width, max_canvas_height))
-    #     assert (proposed_canvas_height_opt is None) or (proposed_canvas_height_opt <= max_canvas_height)
-    #     assert (proposed_canvas_width_opt is None) or (proposed_canvas_width_opt <= max_canvas_width)
-    #     self.world_width = world_width
-    #     self.world_height = world_height
-    #     # I need to find MAX screen width and height such that
-    #     # (world_width/world_height) == (screen_width/screen_height)
-    #     # let's say that I choose screen width as max_width. What is the value of the height?
-    #     possible_width = max_canvas_width if proposed_canvas_width_opt is None else proposed_canvas_width_opt
-    #     possible_height = (self.world_height * possible_width) / self.world_width
-    #     if possible_height <= max_canvas_height:
-    #         # sold!
-    #         self.canvas_width = possible_width
-    #         self.canvas_height = possible_height
-    #     else:
-    #         # let's say that I choose screen height as max_height. What is the value of the width?
-    #         possible_height = max_canvas_height if proposed_canvas_height_opt is None else proposed_canvas_height_opt
-    #         possible_width = (self.world_width * possible_height) / self.world_height
-    #         if possible_width <= max_canvas_width:
-    #             # sold!
-    #             self.canvas_width = possible_width
-    #             self.canvas_height = possible_height
-    #         else:
-    #             raise RuntimeError(
-    #                 "Impossible to create a canvas with proposed height = %.2f or width = %.2f (maxs for screen are height = %.2f and width = %.2f)" %
-    #                 (possible_height, possible_width, max_canvas_height, max_canvas_width))
-    #     self.screen_width = int(math.floor(self.canvas_width + 2 * window_width_border))
-    #     self.screen_height = int(math.floor(self.canvas_height + 2 * window_height_border))
-    #     # create world 2 canvas conversion matrix:
-    #     a = self.canvas_width / self.world_width
-    #     b = self.canvas_height / self.world_height
-    #     self.transformation_matrix = np.zeros((3,3))
-    #     self.transformation_matrix[0][0] = a
-    #     self.transformation_matrix[1][1] = -b
-    #     self.transformation_matrix[0][2] = window_width_border
-    #     self.transformation_matrix[1][2] = window_height_border + self.canvas_height
-    #     self.transformation_matrix[2][2] = 1
-
 
     def world_tuple_2_screen(self, x: float, y: float) -> Tuple[float, float]:
         "Transforms a tuple (representing a point) in world to a point in screen."
