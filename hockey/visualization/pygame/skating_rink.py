@@ -22,7 +22,8 @@ class SkatingRinklPygameRenderable(Renderable):
         super().__init__()
         self.ice_rink = ice_rink
         self.converter = World2CanvasConverter(
-            world_width=self.ice_rink.width, world_height=self.ice_rink.height, window_border=(10, 10))
+            world_X_limits=(-0.5,self.ice_rink.width + 0.5), world_Y_limits=(-0.5, self.ice_rink.height + 0.5),
+            window_width_border=100, window_height_border=10)
 
     def representation(self) -> DrawingObjects:
         cells_in_sc = []
@@ -34,8 +35,8 @@ class SkatingRinklPygameRenderable(Renderable):
                           left=x_in_sc,
                           width=self.converter.length_on_screen(1),
                           height=self.converter.length_on_screen(1),
-                          color=Color.TOMATO,
-                          lines_thickness=3))
+                          color=Color.GREEN,
+                          lines_thickness=1))
         rink = DrawingObjects(rects=cells_in_sc, circles=[], lines=[])
         puck = PuckPygameRenderable(puck=self.ice_rink.puck, w2c_converter=self.converter).representation()
         all_defense_players = reduce(
