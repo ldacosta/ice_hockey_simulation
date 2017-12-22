@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""Visualization of particles on ice.
+
+TODO:
+
+"""
+
 import getopt
 import os
 import sys
@@ -13,9 +20,7 @@ from util.base import read_and_merge_dataframes
 
 from hockey.core.ice_surface.ice_rink import SkatingIce
 from hockey.core.folder_manager import FolderManager
-from hockey.core.ice_surface.no_obstacles import Ice5x5 as NoObstacles5x5
-from hockey.visualization.pygame.global_def import HALF_ICE_WIDTH, HALF_ICE_HEIGHT
-from hockey.visualization.pygame.half_rink import HalfRinklPygameRenderable
+from hockey.core.ice_surface.no_obstacles import Ice5x5 as NoObstacles5x5, IceNxN
 from hockey.visualization.pygame.skating_rink import SkatingRinklPygameRenderable
 
 def show_options():
@@ -67,9 +72,6 @@ def visualize(argv, ice_environment: SkatingIce, renderable_ice: Renderable):
 
     # all model files, concatenated
     model_df = read_and_merge_dataframes(folder_manager.model_dir, prefix_fname="", verbose=True)
-    # num_steps = model_df["steps"].max()
-    # num_goals = model_df["goals"].max()
-    # print("[Recording length: %d minutes] %d steps of simulation, %d goals" % (RECORD_THIS_MANY_MINUTES, num_steps, num_goals))
     DATA_EVERY_SECS = round(model_df.iloc[2]["timestamp"] - model_df.iloc[1]["timestamp"], 5)
     # all agent files, concatenated
     agents_df = read_and_merge_dataframes(folder_manager.agents_dir, prefix_fname="", verbose=True)
@@ -131,6 +133,6 @@ def visualize(argv, ice_environment: SkatingIce, renderable_ice: Renderable):
         pygame.display.update()
 
 if __name__ == "__main__":
-    skating_ice = NoObstacles5x5(how_many_offense=1, how_many_defense=0)
+    skating_ice = IceNxN(width=10, height=10, how_many_offense=1, how_many_defense=0)
     rendr = SkatingRinklPygameRenderable(ice_rink=skating_ice)
     visualize(sys.argv[1:], ice_environment = skating_ice, renderable_ice=rendr)
